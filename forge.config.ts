@@ -9,7 +9,8 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: 'build/icon',
-    executableName: 'chatguessr'
+    executableName: 'chatguessr',
+    arch: ['x64', 'arm64'], // Target both x64 and arm64 architectures
   },
   makers: [
     new MakerSquirrel({
