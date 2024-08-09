@@ -18,7 +18,7 @@ import {
   parseUserDate
 } from './utils/gameHelper'
 import { getEmoji, randomCountryFlag, selectFlag } from './lib/flags/flags'
-import countryCodes from './lib/countryCodes.json'
+import streakCodes from './lib/streakCodes.json'
 import countryCodeCountdown from './lib/countryCodeCountdown.json'
 
 const SOCKET_SERVER_URL =
@@ -137,7 +137,7 @@ export default class GameHandler {
 
   async getCountryNameLenght(countryCode:string): Promise<number | boolean> {
 
-    let country = countryCodes[countryCode].toLowerCase()
+    let country = streakCodes[countryCode].toLowerCase()
     if (country === undefined) {
       return false
     }
@@ -154,7 +154,7 @@ export default class GameHandler {
     if(countryIsos.length === 0){
       return false
     }
-    let countryName = countryCodeCountdown.find(x=>x.code == countryCodes[countryIsos[0]].toLowerCase())
+    let countryName = countryCodeCountdown.find(x=>x.code == streakCodes[countryIsos[0]].toLowerCase())
     if (countryName === undefined) {
       return false
     }
@@ -762,7 +762,7 @@ export default class GameHandler {
 
       const url = await makeMapsUrl(lastLocation.location)
       await this.#backend?.sendMessage(
-        `${returnNumber} was on the map "${lastLocation.map_name}" in ${getEmoji(lastLocation.country)} ${lastLocation.country}: ${url}`
+        `${returnNumber} was on the map "${lastLocation.map_name}": ${url}`
       )
       return
     }
@@ -804,6 +804,13 @@ export default class GameHandler {
       const dateInfo = await parseUserDate(date)
       if (dateInfo.timeStamp < 0) {
         await this.#backend?.sendMessage(`${userstate['display-name']}: ${dateInfo.description}.`)
+        return
+      }
+      const hasGuessedOnOngoingRound = this.#db.userGuessedOnOngoingRound(userId)
+      if (hasGuessedOnOngoingRound) {
+        await this.#backend?.sendMessage(
+          `${userstate['display-name']}: ${settings.getUserStatsCmd} cannot be used after guessing during an ongoing round.`
+        )
         return
       }
       const userInfo = this.#db.getUserStats(userId, dateInfo.timeStamp)
