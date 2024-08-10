@@ -67,9 +67,9 @@
   position: relative;
   z-index: 999;
 }
-/* onhover change opacity of correct-location-marker to 0.2 */
+/* change opacity of correct-location-marker on hover */
 [data-qa="correct-location-marker"]:hover {
-  opacity: 0.2;
+  opacity: 0.4;
 }
 
 .gm-style .gm-style-iw-c,

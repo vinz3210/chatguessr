@@ -11,10 +11,6 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
   const REMOVE_COMPASS_CSS = '[data-qa="compass"], [class^="panorama-compass_"] { display: none; }'
   compassRemover.textContent = REMOVE_COMPASS_CSS
 
-  if (settings.noCar) {
-    noCarScript()
-  }
-
   if (settings.noCompass) {
     document.head.append(compassRemover)
   }
@@ -22,7 +18,10 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
   window.toggleNoCarMode = (el) => {
     settings.noCar = el.checked
     setLocalStorage('cg_ncnc__settings', settings)
-    location.reload()
+    if (window.ppController) {
+      window.pp.hideCar = settings.noCar
+      window.ppController.updateState(window.pp)
+    }
   }
 
   window.toggleNoCompassMode = (el) => {
@@ -85,88 +84,3 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
     childList: true
   })
 })()
-
-function noCarScript() {
-  const OPTIONS = { colorR: 0.5, colorG: 0.5, colorB: 0.5 }
-  const vertexOld =
-    'const float f=3.1415926;varying vec3 a;uniform vec4 b;attribute vec3 c;attribute vec2 d;uniform mat4 e;void main(){vec4 g=vec4(c,1);gl_Position=e*g;a=vec3(d.xy*b.xy+b.zw,1);a*=length(c);}'
-  const fragOld =
-    'precision highp float;const float h=3.1415926;varying vec3 a;uniform vec4 b;uniform float f;uniform sampler2D g;void main(){vec4 i=vec4(texture2DProj(g,a).rgb,f);gl_FragColor=i;}'
-  const vertexNew = `
-            const float f=3.1415926;
-            varying vec3 a;
-            varying vec3 potato;
-            uniform vec4 b;
-            attribute vec3 c;
-            attribute vec2 d;
-            uniform mat4 e;
-            void main(){
-                vec4 g=vec4(c,1);
-                gl_Position=e*g;
-                a = vec3(d.xy * b.xy + b.zw,1);
-                a *= length(c);
-                potato = vec3(d.xy, 1.0) * length(c);
-            }
-        `
-  const fragNew = `
-            precision highp float;
-            const float h=3.1415926;
-            varying vec3 a;
-            varying vec3 potato;
-            uniform vec4 b;
-            uniform float f;
-            uniform sampler2D g;
-            void main(){
-                vec2 aD = potato.xy / a.z;
-                float thetaD = aD.y;
-                float thresholdD1 = 0.6;
-                float thresholdD2 = 0.7;
-                float x = aD.x;
-                float y = abs(4.0*x - 2.0);
-                float phiD = smoothstep(0.0, 1.0, y > 1.0 ? 2.0 - y : y);
-                vec4 i = vec4(thetaD > mix(thresholdD1, thresholdD2, phiD)
-                ? vec3(float(${OPTIONS.colorR}), float(${OPTIONS.colorG}), float(${OPTIONS.colorB})) // texture2DProj(g,a).rgb * 0.25
-                : texture2DProj(g,a).rgb,f);
-                gl_FragColor=i;
-            }
-        `
-
-  function installShaderSource(ctx: WebGLRenderingContext | WebGL2RenderingContext) {
-    const g = ctx.shaderSource
-    function shaderSource(...args: WebGLRenderingContext['shaderSource'][]) {
-      if (typeof args[1] === 'string') {
-        let glsl: string = args[1]
-        if (glsl === vertexOld) glsl = vertexNew
-        else if (glsl === fragOld) glsl = fragNew
-        return g.call(this, args[0], glsl)
-      }
-      return g.apply(this, args)
-    }
-    shaderSource.bestcity = 'bintulu'
-    ctx.shaderSource = shaderSource
-  }
-
-  function installGetContext(el: HTMLCanvasElement) {
-    const g = el.getContext
-    el.getContext = function (...args) {
-      if (args[0] === 'webgl' || args[0] === 'webgl2') {
-        const ctx: WebGLRenderingContext | WebGL2RenderingContext = g.apply(this, args)
-        if (ctx && ctx.shaderSource && ctx.shaderSource.bestcity !== 'bintulu') {
-          installShaderSource(ctx)
-        }
-        return ctx
-      }
-      return g.apply(this, args)
-    }
-  }
-
-  const createElement = document.createElement.bind(document)
-  document.createElement = function (tagName: string, options?: ElementCreationOptions) {
-    if (tagName === 'canvas' || tagName === 'CANVAS') {
-      const el = createElement('canvas')
-      installGetContext(el)
-      return el
-    }
-    return createElement(tagName, options)
-  }
-}
