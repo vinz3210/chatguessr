@@ -338,7 +338,7 @@ class db {
     const id = randomUUID()
     const insertGuess = this.#db.prepare(`
       INSERT INTO guesses(id, round_id, user_id, location, country, streak, last_streak, distance, score, created_at, is_random_plonk)
-      VALUES (:id, :roundId, :userId, :location, :country, :streak, :lastStreak, :distance, :score, :createdAt, :isRandomPlonk)
+      VALUES (:id, :roundId, :userId, :location, :streakCode, :streak, :lastStreak, :distance, :score, :createdAt, :isRandomPlonk)
     `)
 
     insertGuess.run({
