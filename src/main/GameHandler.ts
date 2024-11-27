@@ -919,6 +919,8 @@ export default class GameHandler {
       returnString += `oceanPlonk: mandatory | `
     if (settings.waterPlonkMode === "illegal")
       returnString += `oceanPlonk: illegal | `
+    if (settings.waterPlonkMode === "illegal_refined")
+      returnString += `waterPlonk: illegal | `
     if (settings.invertScoring)
       returnString += `invertScoring: on | `
     if (settings.isGameOfChickenModeActivated){
