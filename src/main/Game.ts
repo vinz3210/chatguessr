@@ -260,7 +260,7 @@ export default class Game {
     }
 
     const distance = haversineDistance(location, this.location!)
-    var score = streamerGuess.timedOut ? 0 : calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring)
+    var score = streamerGuess.timedOut ? 0 : calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location, this.waterPlonkMode), this.invertScoring)
     if(this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!) !== 1 && this.isGameOfChickenModeActivated){
       const didUserWinLastRound = this.#db.didUserWinLastRound('BROADCASTER', this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)
       if(didUserWinLastRound){
@@ -315,7 +315,7 @@ export default class Game {
     }
 
     const distance = haversineDistance(location, this.location!)
-    var score = calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring)
+    var score = calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location, this.waterPlonkMode), this.invertScoring)
     if(this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!) !== 1 && this.isGameOfChickenModeActivated){
 
       const didUserWinLastRound = this.#db.didUserWinLastRound(dbUser.id, this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)
@@ -469,7 +469,7 @@ export default class Game {
       parts.push(`Darts 🎯(${bustSign}${this.#settings.dartsTargetScore})`)
     }
     if (this.#settings.waterPlonkMode !== "normal"){
-      if(this.#settings.waterPlonkMode === "illegal"){
+      if((this.#settings.waterPlonkMode === "illegal") || (this.#settings.waterPlonkMode === "illegal_refined")){
         parts.push("🌊❌")
       }
       if(this.#settings.waterPlonkMode === "mandatory"){

@@ -328,7 +328,10 @@
     Ocean Plonks Illegal Mode
     <input type="radio" v-model="settings.waterPlonkMode" value="illegal" />
   </label>
-
+  <label class="form__group" data-tip="0 Points for Plonks in any bodies of water (based on OSM-data)">
+    Water plonks illegal (Experimental)
+    <input type="radio" v-model="settings.waterPlonkMode" value="illegal_refined" />
+  </label>
 
   </div>
 

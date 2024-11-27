@@ -131,6 +131,7 @@ export function haversineDistance(mk1: LatLng, mk2: LatLng): number {
 export function calculateScore(distance: number, scale: number, isCorrectCountry: boolean, isClosestInWrongCountryModeActivated: boolean,  waterPlonkMode: string, isPlonkOnLand: boolean, invertScores: boolean)  {
   if (isCorrectCountry && isClosestInWrongCountryModeActivated) return 0
   if (waterPlonkMode == "illegal" && !isPlonkOnLand) return 0
+  if (waterPlonkMode == "illegal_refined" && !isPlonkOnLand) return 0
   if (waterPlonkMode == "mandatory" && isPlonkOnLand) return 0
   if (!invertScores){
     if (distance * 1000 < 25) return 5000
@@ -325,9 +326,63 @@ export async function getRandomCoordsNotInLand(bounds: Bounds | null = null, i: 
   return { lat, lng }
 }
 
-export async function isCoordsInLand(location: LatLng): Promise<boolean> {
+async function getEnclosingFeatures(lat, lon) {
+  const query = `
+      [out:json];
+      is_in(${lat}, ${lon});
+      out geom;
+  `;
+
+  const url = "https://overpass-api.de/api/interpreter";
+
+  try {
+      const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ data: query }),
+      });
+
+      if (!response.ok) {
+          throw new Error(`Error fetching data: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.elements;
+  } catch (error) {
+      console.error("Error querying Overpass API:", error);
+      return null;
+  }
+}
+
+async function checkIfOnLandBasedOnOsm(lat: number, lng: number): Promise<boolean> {
+  const features = await getEnclosingFeatures(lat, lng);
+
+  if (!features || features.length === 0) {
+      return true; // No features to check
+  }
+
+  for (const feat of features) {
+      if (feat.tags && feat.tags["water"]) {
+          console.log("Feature in water found:", feat);
+          return false; // Found a feature with water tag
+      }
+  }
+  // No water feature found
+  return true; 
+}
+
+export async function isCoordsInLand(location: LatLng, waterPlonkMode: string): Promise<boolean> {
   const localResults = countryIso(location.lat, location.lng, true)
-  return localResults.length > 0
+  const isOnLand = localResults.length > 0
+  // 
+  if (waterPlonkMode == "illegal_refined")
+  {
+    return await (isOnLand && checkIfOnLandBasedOnOsm(location.lat, location.lng))
+  }
+  else
+  {
+    return isOnLand;
+  }
 }
 
 export async function getStreamerAvatar(channel: string): Promise<{ avatar: string | undefined }> {
