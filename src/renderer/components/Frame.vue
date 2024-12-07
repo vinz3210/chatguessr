@@ -28,19 +28,23 @@
   <div class="cg-menu">
     <button
       :class="['cg-button', twitchConnectionState.state]"
-      title="Settings (Shortcut: S)"
+      :title="`Settings${keyboardShortCutsEnabled ? ' (Shortcut: S)' : ''}`"
       @click="settingsVisible = true"
     >
       <IconGear />
     </button>
 
-    <button class="cg-button" title="Show/Hide Leaderboard (Shortcut: L)" @click="leaderboardVisible = true">
+    <button
+      class="cg-button" 
+      :title="`Show/Hide Leaderboard${keyboardShortCutsEnabled ? ' (Shortcut: L)' : ''}`"
+      @click="leaderboardVisible = true"
+    >
       <IconLeaderboard />
     </button>
 
     <button
       class="cg-button"
-      title="Show/Hide timer (Shortcut: T)"
+      :title="`Show/Hide timer${keyboardShortCutsEnabled ? ' (Shortcut: T)' : ''}`"
       :hidden="gameState === 'none'"
       @click="widgetVisibility.timerVisible = !widgetVisibility.timerVisible"
     >
@@ -50,7 +54,7 @@
 
     <button
       class="cg-button"
-      title="Show/Hide Scoreboard (Shortcut: H)"
+      :title="`Show/Hide Scoreboard${keyboardShortCutsEnabled ? ' (Shortcut: H)' : ''}`"
       :hidden="gameState === 'none'"
       @click="widgetVisibility.scoreboardAndGgInterfaceVisible = !widgetVisibility.scoreboardAndGgInterfaceVisible"
     >
@@ -124,6 +128,7 @@ const { chatguessrApi } = window
 const scoreboard = shallowRef<InstanceType<typeof Scoreboard> | null>(null)
 const settingsVisible = shallowRef(false)
 const leaderboardVisible = shallowRef(false)
+const keyboardShortCutsEnabled = shallowRef(false)
 
 const gameState = shallowRef<GameState>('none')
 const isMultiGuess = shallowRef<boolean>(false)
@@ -239,14 +244,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', handleKeyDown);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleKeyDown);
-});
-
 onBeforeUnmount(
   chatguessrApi.onGameStarted((_isMultiGuess, _isBRMode, _modeHelp, restoredGuesses, location) => {
     isMultiGuess.value = _isMultiGuess
@@ -254,6 +251,11 @@ onBeforeUnmount(
     console.log("isBRMode", isBRMode.value)
     modeHelp.value = _modeHelp
     gameState.value = 'in-round'
+
+    if (!keyboardShortCutsEnabled.value) {
+      keyboardShortCutsEnabled.value = true;
+      window.addEventListener('keydown', handleKeyDown);
+    }
 
     currentLocation.value = location
     if (satelliteMode.value.enabled) {
@@ -524,6 +526,10 @@ onBeforeUnmount(
 
 onBeforeUnmount(
   chatguessrApi.onGameQuit(() => {
+    if (keyboardShortCutsEnabled.value) {
+      keyboardShortCutsEnabled.value = false;
+      window.removeEventListener('keydown', handleKeyDown);
+    }
     gameState.value = 'none'
     rendererApi.clearMarkers()
   })
