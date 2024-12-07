@@ -28,19 +28,19 @@
   <div class="cg-menu">
     <button
       :class="['cg-button', twitchConnectionState.state]"
-      title="Settings"
+      title="Settings (Shortcut: S)"
       @click="settingsVisible = true"
     >
       <IconGear />
     </button>
 
-    <button class="cg-button" title="Show/Hide Leaderboard" @click="leaderboardVisible = true">
+    <button class="cg-button" title="Show/Hide Leaderboard (Shortcut: L)" @click="leaderboardVisible = true">
       <IconLeaderboard />
     </button>
 
     <button
       class="cg-button"
-      title="Show/Hide timer"
+      title="Show/Hide timer (Shortcut: T)"
       :hidden="gameState === 'none'"
       @click="widgetVisibility.timerVisible = !widgetVisibility.timerVisible"
     >
@@ -50,7 +50,7 @@
 
     <button
       class="cg-button"
-      title="Show/Hide Scoreboard"
+      title="Show/Hide Scoreboard (Shortcut: H)"
       :hidden="gameState === 'none'"
       @click="widgetVisibility.scoreboardAndGgInterfaceVisible = !widgetVisibility.scoreboardAndGgInterfaceVisible"
     >
@@ -219,6 +219,33 @@ watch(
   },
   { immediate: true }
 )
+
+// Keyboard shortcuts
+// Note: These shortcuts are not sent to the game, so make sure to not override any shortcuts that are also used in the game.
+// Some notable examples are 'Spacebar' that is used in game to guess, or 'R' that is used to reset camera when playing moving/no move.
+const shortcutActions = {
+  'KeyS': () => { settingsVisible.value = !settingsVisible.value; }, // Toggle leaderboard
+  'KeyT': () => { widgetVisibility.timerVisible = !widgetVisibility.timerVisible; }, // Toggle timer
+  'KeyL': () => { leaderboardVisible.value = !leaderboardVisible.value; }, // Toggle leaderboard
+  'KeyH': () => { widgetVisibility.scoreboardAndGgInterfaceVisible = !widgetVisibility.scoreboardAndGgInterfaceVisible; },
+};
+
+const handleKeyDown = (event: KeyboardEvent) => {
+  const action = shortcutActions[event.code];
+  if (action) {
+    event.preventDefault(); // Prevent the key event from propagating to the game
+    event.stopPropagation();
+    action();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 
 onBeforeUnmount(
   chatguessrApi.onGameStarted((_isMultiGuess, _isBRMode, _modeHelp, restoredGuesses, location) => {
