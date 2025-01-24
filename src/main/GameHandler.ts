@@ -17,7 +17,7 @@ import {
   getStreamerAvatar,
   parseUserDate,
   getRandomCoordsInLandByCountryCode,
-  checkCountryCodeValidity,
+  checkCountryCodeValidity
 } from './utils/gameHelper'
 import { getEmoji, randomCountryFlag, selectFlag } from './lib/flags/flags'
 import streakCodes from './lib/streakCodes.json'
@@ -52,7 +52,7 @@ export default class GameHandler {
   #russianHitmans: UserData[] = []
 
   #moveCommandTimeKeeper: { [key: string]: number } = {}
-  
+
   TMPZ: boolean
 
   constructor(
@@ -78,22 +78,19 @@ export default class GameHandler {
   openGuesses() {
     this.#game.openGuesses()
     this.#win.webContents.send('switch-on')
-    if(settings.showGuessesAreOpen)
+    if (settings.showGuessesAreOpen)
       this.#backend?.sendMessage(settings.messageGuessesAreOpen, { system: true })
 
-    if(settings.isStartOfRoundCommandActive){
-      this.#backend?.sendMessage(
-        settings.startOfRoundCommand,
-        { system: false }
-      )
+    if (settings.isStartOfRoundCommandActive) {
+      this.#backend?.sendMessage(settings.startOfRoundCommand, { system: false })
     }
   }
 
   closeGuesses() {
     this.#game.closeGuesses()
     this.#win.webContents.send('switch-off')
-    if(settings.showGuessesAreClosed)
-    this.#backend?.sendMessage(settings.messageGuessesAreClosed, { system: true })
+    if (settings.showGuessesAreClosed)
+      this.#backend?.sendMessage(settings.messageGuessesAreClosed, { system: true })
   }
 
   async nextRound(isRestartClick: boolean = false) {
@@ -103,11 +100,13 @@ export default class GameHandler {
       this.#game.finishGame()
       let winner = await this.#showGameResults()
       this.#game.setGameWinner(winner)
-
     } else {
       this.#win.webContents.send('next-round', this.#game.isMultiGuess, this.#game.getLocation())
-      if(settings.showRoundStarted && !isRestartClick)
-        this.#backend?.sendMessage(settings.messageRoundStarted.replace("<round>", this.#game.round.toString()), { system: true })
+      if (settings.showRoundStarted && !isRestartClick)
+        this.#backend?.sendMessage(
+          settings.messageRoundStarted.replace('<round>', this.#game.round.toString()),
+          { system: true }
+        )
       this.openGuesses()
     }
   }
@@ -120,12 +119,15 @@ export default class GameHandler {
   #showRoundResults(location: Location_, roundResults: RoundResult[]) {
     const round = this.#game.isFinished ? this.#game.round : this.#game.round - 1
 
-
-
-    if(settings.countdownMode === "countdown" || settings.countdownMode === "countup"){
+    if (settings.countdownMode === 'countdown' || settings.countdownMode === 'countup') {
       roundResults = roundResults.map((result) => {
-        let countryLength = streakCodeCountdown.find(x=>result.streakCode && x.code === streakCodes[result.streakCode]?.toLowerCase())?.names.replaceAll(" ","").replaceAll("-","").length
-        let countryLengthString = countryLength ? countryLength.toString() : "X"
+        let countryLength = streakCodeCountdown
+          .find(
+            (x) => result.streakCode && x.code === streakCodes[result.streakCode]?.toLowerCase()
+          )
+          ?.names.replaceAll(' ', '')
+          .replaceAll('-', '').length
+        let countryLengthString = countryLength ? countryLength.toString() : 'X'
         result.player.username = `(${countryLengthString}) ${result.player.username}`
         return result
       })
@@ -137,24 +139,26 @@ export default class GameHandler {
       roundResults,
       settings.guessMarkersLimit
     )
-    if(settings.showRoundFinished)
-    this.#backend?.sendMessage(
-      settings.messageRoundFinished.replace('<emoji>', getEmoji(roundResults[0].player.flag)).replace('<username>', roundResults[0].player.username).replace("<round>", round.toString()),
-      { system: true }
-    )
-    if(settings.showBestRandomplonkRound){
-      let randomResults = roundResults.filter(result=>result.isRandomPlonk)
-      if(randomResults.length){
+    if (settings.showRoundFinished)
+      this.#backend?.sendMessage(
+        settings.messageRoundFinished
+          .replace('<emoji>', getEmoji(roundResults[0].player.flag))
+          .replace('<username>', roundResults[0].player.username)
+          .replace('<round>', round.toString()),
+        { system: true }
+      )
+    if (settings.showBestRandomplonkRound) {
+      let randomResults = roundResults.filter((result) => result.isRandomPlonk)
+      if (randomResults.length) {
         let bestRandomPlonk = randomResults[0]
         if (bestRandomPlonk) {
           let distance = bestRandomPlonk.distance
           let unit = 'km'
-          let distanceNumber = "0"
+          let distanceNumber = '0'
           if (distance < 1) {
             distanceNumber = (distance * 1000).toFixed(2)
             unit = 'm'
-          }
-          else {
+          } else {
             distanceNumber = distance.toFixed(2)
           }
           let msg = `Best Random Plonk: ${bestRandomPlonk.score} points (${distanceNumber} ${unit}) by ${bestRandomPlonk.player.username}. `
@@ -162,277 +166,302 @@ export default class GameHandler {
         }
       }
     }
-    if(this.#game.isGiftingPointsRound && this.#game.roundPointGift > 0 && this.#game.pointGiftCommand !== "")
-    this.#backend?.sendMessage(
-      `${this.#game.pointGiftCommand} ${
-        roundResults[0].player.username
-      } ${this.#game.roundPointGift}`,
-      { system: false }
+    if (
+      this.#game.isGiftingPointsRound &&
+      this.#game.roundPointGift > 0 &&
+      this.#game.pointGiftCommand !== ''
     )
+      this.#backend?.sendMessage(
+        `${this.#game.pointGiftCommand} ${
+          roundResults[0].player.username
+        } ${this.#game.roundPointGift}`,
+        { system: false }
+      )
 
     this.#battleRoyaleCounter = {}
     this.#streamerDidRandomPlonk = false
   }
 
-  dartsSort(a,b){
+  dartsSort(a, b) {
     let diff_a = Math.abs(a.totalScore - settings.dartsTargetScore)
     let diff_b = Math.abs(b.totalScore - settings.dartsTargetScore)
     return diff_a - diff_b
   }
 
-  async getCountryNameLenght(streakCode:string): Promise<number | boolean> {
-
+  async getCountryNameLenght(streakCode: string): Promise<number | boolean> {
     let country = streakCodes[streakCode].toLowerCase()
     if (country === undefined) {
       return false
     }
-    let countryName = streakCodeCountdown.find(x=>x.code === country)?.names
+    let countryName = streakCodeCountdown.find((x) => x.code === country)?.names
     if (countryName === undefined) {
       return false
     }
     return countryName.length
-
   }
 
   convertLatLngToCountdownName(lat: number, lng: number): string | boolean {
     let countryIsos = countryIso(lat, lng, true)
-    try{
-      if(countryIsos.length === 0){
+    try {
+      if (countryIsos.length === 0) {
         return false
       }
-      let countryName = streakCodeCountdown.find(x=>x.code == streakCodes[countryIsos[0]]?.toLowerCase())
+      let countryName = streakCodeCountdown.find(
+        (x) => x.code == streakCodes[countryIsos[0]]?.toLowerCase()
+      )
       if (countryName === undefined) {
         return false
       }
-      return countryName.names}
-    catch{
-      console.log("Error in convertLatLngToCountdownName")
+      return countryName.names
+    } catch {
+      console.log('Error in convertLatLngToCountdownName')
       console.log(countryIsos)
       return false
     }
   }
 
   async #showGameResults() {
-
     var gameResults = this.#game.getGameResults()
-    if(settings.countdownMode !== "normal"){
-
-      if(settings.countdownMode === "abc"){
-        let allowed_start_characters = settings.ABCModeLetters.toLowerCase().split("")
+    if (settings.countdownMode !== 'normal') {
+      if (settings.countdownMode === 'abc') {
+        let allowed_start_characters = settings.ABCModeLetters.toLowerCase().split('')
         // check if allowed_start_characters only contains characters and remove other chars
-        allowed_start_characters = allowed_start_characters.filter(x=>x.match(/[a-z]/))
+        allowed_start_characters = allowed_start_characters.filter((x) => x.match(/[a-z]/))
 
-
-        gameResults.forEach(gameResult=>{
+        gameResults.forEach((gameResult) => {
           let countdownCountries: (string | boolean)[] = []
-          gameResult.guesses.every((guess)=>{
-
+          gameResult.guesses.every((guess) => {
             let lat = guess?.lat
             let lng = guess?.lng
-            if(lat === undefined || lng === undefined){
+            if (lat === undefined || lng === undefined) {
               lat = 0
               lng = 0
             }
             let countryName = this.convertLatLngToCountdownName(lat, lng)
             countdownCountries.push(countryName)
-            return true;
+            return true
           })
 
-          gameResult.disqualifiedMessage = countdownCountries.map(x=>x === false ? "Invalid" : x).join(" => ")
-          if(countdownCountries.includes(false)){
+          gameResult.disqualifiedMessage = countdownCountries
+            .map((x) => (x === false ? 'Invalid' : x))
+            .join(' => ')
+          if (countdownCountries.includes(false)) {
             gameResult.isDisqualified = true
           }
-          if(countdownCountries.length > 0){
-            countdownCountries.every((countryName)=>{
-              if(countryName === false){
+          if (countdownCountries.length > 0) {
+            countdownCountries.every((countryName) => {
+              if (countryName === false) {
                 gameResult.isDisqualified = true
                 return false
-              }
-              else{
-                try{
-
-                if(!allowed_start_characters.includes((countryName as string).toLowerCase()[0])){
-                  gameResult.isDisqualified = true
-                  return false
-                }
-                return true
-                }
-                catch{
-                  console.log("Error in ABC mode")
+              } else {
+                try {
+                  if (
+                    !allowed_start_characters.includes((countryName as string).toLowerCase()[0])
+                  ) {
+                    gameResult.isDisqualified = true
+                    return false
+                  }
+                  return true
+                } catch {
+                  console.log('Error in ABC mode')
                   console.log(countryName)
-                  console.log("gameResult.guesses:")
+                  console.log('gameResult.guesses:')
                   console.log(gameResult.guesses)
                   gameResult.isDisqualified = true
                   return false
                 }
               }
             })
-
           }
         })
-        let qualifiedResults = gameResults.filter((result) => !result.isDisqualified).map(gameResult=>{
-          gameResult.player.username = "✅" + gameResult.player.username
-          return gameResult
-        })
-        let disqualifiedResults = gameResults.filter((result) => result.isDisqualified).map(gameResult=>{
-          gameResult.player.username = "❌" + gameResult.player.username
-          return gameResult
-        })
+        let qualifiedResults = gameResults
+          .filter((result) => !result.isDisqualified)
+          .map((gameResult) => {
+            gameResult.player.username = '✅' + gameResult.player.username
+            return gameResult
+          })
+        let disqualifiedResults = gameResults
+          .filter((result) => result.isDisqualified)
+          .map((gameResult) => {
+            gameResult.player.username = '❌' + gameResult.player.username
+            return gameResult
+          })
         gameResults = qualifiedResults.concat(disqualifiedResults)
       }
 
-      if(settings.countdownMode === "alphabeticalAZ" || settings.countdownMode === "alphabeticalZA"){
-        gameResults.forEach(gameResult=>{
+      if (
+        settings.countdownMode === 'alphabeticalAZ' ||
+        settings.countdownMode === 'alphabeticalZA'
+      ) {
+        gameResults.forEach((gameResult) => {
           let countdownCountries: (string | boolean)[] = []
-          gameResult.guesses.every((guess)=>{
+          gameResult.guesses.every((guess) => {
             let lat = guess?.lat
             let lng = guess?.lng
-            if(lat === undefined || lng === undefined){
+            if (lat === undefined || lng === undefined) {
               lat = 0
               lng = 0
             }
             let countryName = this.convertLatLngToCountdownName(lat, lng)
             countdownCountries.push(countryName)
-            return true;
+            return true
           })
 
-          gameResult.disqualifiedMessage = countdownCountries.map(x=>x === false ? "Invalid" : x).join(" => ")
-          if(countdownCountries.includes(false)){
+          gameResult.disqualifiedMessage = countdownCountries
+            .map((x) => (x === false ? 'Invalid' : x))
+            .join(' => ')
+          if (countdownCountries.includes(false)) {
             gameResult.isDisqualified = true
           }
-          if(settings.countdownMode === "alphabeticalAZ"){
+          if (settings.countdownMode === 'alphabeticalAZ') {
             // check if the coundownCountries is in ascending order
-            let isSorted = countdownCountries.map(x=>x?(x as string).toLowerCase():false).every((val, i, arr) => !i || val > arr[i - 1]);
-            if(!isSorted){
+            let isSorted = countdownCountries
+              .map((x) => (x ? (x as string).toLowerCase() : false))
+              .every((val, i, arr) => !i || val > arr[i - 1])
+            if (!isSorted) {
               gameResult.isDisqualified = true
             }
           }
-          if(settings.countdownMode === "alphabeticalZA"){
+          if (settings.countdownMode === 'alphabeticalZA') {
             // check if the coundownCountries is in descending order
-            let isSorted = countdownCountries.map(x=>x?(x as string).toLowerCase():false).every((val, i, arr) => !i || val < arr[i - 1]);
-            if(!isSorted){
+            let isSorted = countdownCountries
+              .map((x) => (x ? (x as string).toLowerCase() : false))
+              .every((val, i, arr) => !i || val < arr[i - 1])
+            if (!isSorted) {
               gameResult.isDisqualified = true
             }
           }
         })
-        let qualifiedResults = gameResults.filter((result) => !result.isDisqualified).map(gameResult=>{
-          gameResult.player.username = "✅" + gameResult.player.username
-          return gameResult
-        })
-        let disqualifiedResults = gameResults.filter((result) => result.isDisqualified).map(gameResult=>{
-          gameResult.player.username = "❌" + gameResult.player.username
-          return gameResult
-        })
+        let qualifiedResults = gameResults
+          .filter((result) => !result.isDisqualified)
+          .map((gameResult) => {
+            gameResult.player.username = '✅' + gameResult.player.username
+            return gameResult
+          })
+        let disqualifiedResults = gameResults
+          .filter((result) => result.isDisqualified)
+          .map((gameResult) => {
+            gameResult.player.username = '❌' + gameResult.player.username
+            return gameResult
+          })
         gameResults = qualifiedResults.concat(disqualifiedResults)
-
       }
 
-      if(settings.countdownMode === "countdown" || settings.countdownMode === "countup"){
-        gameResults.forEach(gameResult=>{
+      if (settings.countdownMode === 'countdown' || settings.countdownMode === 'countup') {
+        gameResults.forEach((gameResult) => {
           let countdownDisqualified = false
           let countdownLength: number[] = []
           let countdownCountries: (string | boolean)[] = []
-          gameResult.guesses.every((guess)=>{
+          gameResult.guesses.every((guess) => {
             let lat = guess?.lat
             let lng = guess?.lng
-            if(lat === undefined || lng === undefined){
+            if (lat === undefined || lng === undefined) {
               lat = 0
               lng = 0
             }
             let countryName = this.convertLatLngToCountdownName(lat, lng)
 
             countdownCountries.push(countryName)
-            return true;
+            return true
           })
 
-          gameResult.guesses.every((guess)=>{
-            if(countdownDisqualified)
-              return false;
+          gameResult.guesses.every((guess) => {
+            if (countdownDisqualified) return false
             let lat = guess?.lat
             let lng = guess?.lng
-            if(lat === undefined || lng === undefined){
+            if (lat === undefined || lng === undefined) {
               lat = 0
               lng = 0
             }
             let countryName = this.convertLatLngToCountdownName(lat, lng)
-            if(countryName === false){
+            if (countryName === false) {
               countdownDisqualified = true
-              return false;
-            }
-            else{
+              return false
+            } else {
               //this wont happen because the convertLatLngToCountdownName function will always return a false or string
               countryName = countryName as string
             }
-            let countryNameLenght = countryName.replaceAll(" ", "").length
+            let countryNameLenght = countryName.replaceAll(' ', '').length
 
             countdownLength.push(countryNameLenght)
-            return true;
+            return true
           })
-          gameResult.disqualifiedMessage = countdownCountries.map(x=>{
-            if(x === false || x === true){
-              return "Invalid"
-            }
-            else{
-              return `${x.replaceAll(" ", "")} (${x.replaceAll(" ", "").length})`
-            }
-          }).join(" => ")
-          if(countdownDisqualified){
+          gameResult.disqualifiedMessage = countdownCountries
+            .map((x) => {
+              if (x === false || x === true) {
+                return 'Invalid'
+              } else {
+                return `${x.replaceAll(' ', '')} (${x.replaceAll(' ', '').length})`
+              }
+            })
+            .join(' => ')
+          if (countdownDisqualified) {
             gameResult.isDisqualified = true
           }
-          if(settings.countdownMode === "countdown"){
+          if (settings.countdownMode === 'countdown') {
             // check if the coundownLength is in descending order
-            let isSorted = countdownLength.every((val, i, arr) => !i || val < arr[i - 1]);
-            if(!isSorted){
+            let isSorted = countdownLength.every((val, i, arr) => !i || val < arr[i - 1])
+            if (!isSorted) {
               gameResult.isDisqualified = true
             }
           }
-          if(settings.countdownMode === "countup"){
+          if (settings.countdownMode === 'countup') {
             // check if the coundownLength is in ascending order
-            let isSorted = countdownLength.every((val, i, arr) => !i || val > arr[i - 1]);
-            if(!isSorted){
+            let isSorted = countdownLength.every((val, i, arr) => !i || val > arr[i - 1])
+            if (!isSorted) {
               gameResult.isDisqualified = true
             }
           }
         })
-        let qualifiedResults = gameResults.filter((result) => !result.isDisqualified).map(gameResult=>{
-          gameResult.player.username = "✅" + gameResult.player.username
-          return gameResult
-        })
-        let disqualifiedResults = gameResults.filter((result) => result.isDisqualified).map(gameResult=>{
-          gameResult.player.username = "❌" + gameResult.player.username
-          return gameResult
-        })
+        let qualifiedResults = gameResults
+          .filter((result) => !result.isDisqualified)
+          .map((gameResult) => {
+            gameResult.player.username = '✅' + gameResult.player.username
+            return gameResult
+          })
+        let disqualifiedResults = gameResults
+          .filter((result) => result.isDisqualified)
+          .map((gameResult) => {
+            gameResult.player.username = '❌' + gameResult.player.username
+            return gameResult
+          })
         gameResults = qualifiedResults.concat(disqualifiedResults)
       }
     }
 
-
-
-    if(settings.isDartsMode){
-      if(settings.isDartsModeBust){
+    if (settings.isDartsMode) {
+      if (settings.isDartsModeBust) {
         let results_with_5_guesses_and_not_busted = gameResults.filter(
-          (result) => result.guesses.filter(Boolean).length === 5 && result.totalScore <= settings.dartsTargetScore
+          (result) =>
+            result.guesses.filter(Boolean).length === 5 &&
+            result.totalScore <= settings.dartsTargetScore
         )
         let results_with_5_guesses_and_busted = gameResults.filter(
-          (result) => result.guesses.filter(Boolean).length === 5 && result.totalScore > settings.dartsTargetScore
+          (result) =>
+            result.guesses.filter(Boolean).length === 5 &&
+            result.totalScore > settings.dartsTargetScore
         )
         let results_without_5_guesses = gameResults.filter(
           (result) => result.guesses.filter(Boolean).length !== 5
         )
-        results_with_5_guesses_and_not_busted.sort((a, b) => this.dartsSort(a,b))
-        results_with_5_guesses_and_busted.sort((a, b) => this.dartsSort(a,b))
-        results_without_5_guesses.sort((a, b) => this.dartsSort(a,b))
-        gameResults = results_with_5_guesses_and_not_busted.concat(results_with_5_guesses_and_busted, results_without_5_guesses)
-
-      }else{
-        let results_with_5_guesses = gameResults.filter((result) => result.guesses.filter(Boolean).length === 5)
-        let results_without_5_guesses = gameResults.filter((result) => result.guesses.filter(Boolean).length !== 5)
-        results_with_5_guesses.sort((a, b) => this.dartsSort(a,b))
-        results_without_5_guesses.sort((a, b) => this.dartsSort(a,b))
+        results_with_5_guesses_and_not_busted.sort((a, b) => this.dartsSort(a, b))
+        results_with_5_guesses_and_busted.sort((a, b) => this.dartsSort(a, b))
+        results_without_5_guesses.sort((a, b) => this.dartsSort(a, b))
+        gameResults = results_with_5_guesses_and_not_busted.concat(
+          results_with_5_guesses_and_busted,
+          results_without_5_guesses
+        )
+      } else {
+        let results_with_5_guesses = gameResults.filter(
+          (result) => result.guesses.filter(Boolean).length === 5
+        )
+        let results_without_5_guesses = gameResults.filter(
+          (result) => result.guesses.filter(Boolean).length !== 5
+        )
+        results_with_5_guesses.sort((a, b) => this.dartsSort(a, b))
+        results_without_5_guesses.sort((a, b) => this.dartsSort(a, b))
         gameResults = results_with_5_guesses.concat(results_without_5_guesses)
-
       }
-
     }
     const locations = this.#game.getLocations()
 
@@ -453,21 +482,27 @@ export default class GameHandler {
     } catch (err) {
       console.error('could not upload summary', err)
     }
-    if(settings.showGameFinished)
+    if (settings.showGameFinished)
       await this.#backend?.sendMessage(
-        settings.messageGameFinished.replace('<emoji>', getEmoji(gameResults[0].player.flag)).replace('<username>', gameResults[0].player.username).replace('<link>',link != undefined ? `${link}` : ''),
+        settings.messageGameFinished
+          .replace('<emoji>', getEmoji(gameResults[0].player.flag))
+          .replace('<username>', gameResults[0].player.username)
+          .replace('<link>', link != undefined ? `${link}` : ''),
         { system: true }
       )
 
-    if(this.#game.isGiftingPointsGame && this.#game.gamePointGift > 0  && this.#game.pointGiftCommand !== "")
-
-    this.#backend?.sendMessage(
-      `${this.#game.pointGiftCommand} ${
-        gameResults[0].player.username
-      } ${this.#game.gamePointGift}`,
-      { system: false }
+    if (
+      this.#game.isGiftingPointsGame &&
+      this.#game.gamePointGift > 0 &&
+      this.#game.pointGiftCommand !== ''
     )
-    console.log("gameResults[0].player: ", gameResults[0].player)
+      this.#backend?.sendMessage(
+        `${this.#game.pointGiftCommand} ${
+          gameResults[0].player.username
+        } ${this.#game.gamePointGift}`,
+        { system: false }
+      )
+    console.log('gameResults[0].player: ', gameResults[0].player)
     return gameResults[0].player.userId
   }
 
@@ -489,6 +524,7 @@ export default class GameHandler {
               'game-started',
               this.#game.isMultiGuess,
               settings.isBRMode,
+              settings.showStreamerRandomPlonkButton,
               this.#game.getModeHelp(),
               restoredGuesses,
               this.#game.getLocation()
@@ -498,22 +534,21 @@ export default class GameHandler {
               this.#backend?.sendMessage(`🌎 Round ${this.#game.round} has resumed`, {
                 system: true
               })
-            } else if (this.#game.round === 1 ) {
-              if(settings.showNewSeedStarted)
+            } else if (this.#game.round === 1) {
+              if (settings.showNewSeedStarted)
                 this.#backend?.sendMessage(
-                  settings.messageNewSeedStarted.replace('<map>', this.#game.mapName), {
-                  system: true
-                })
-              if(settings.autoShowMode)
-                this.#backend?.sendMessage(
-                  this.generateModeString(),
-                  { system: true }
+                  settings.messageNewSeedStarted.replace('<map>', this.#game.mapName),
+                  {
+                    system: true
+                  }
                 )
+              if (settings.autoShowMode)
+                this.#backend?.sendMessage(this.generateModeString(), { system: true })
             } else {
               if (settings.showRoundStarted)
-              this.#backend?.sendMessage(`🌎 Round ${this.#game.round} has started`, {
-                system: true
-              })
+                this.#backend?.sendMessage(`🌎 Round ${this.#game.round} has started`, {
+                  system: true
+                })
             }
 
             this.openGuesses()
@@ -555,40 +590,56 @@ export default class GameHandler {
       // Checks and update seed when the this.game has refreshed
       // update the current location if it was skipped
       // if the streamer has guessed returns scores
-          /// handle rewards
+      /// handle rewards
 
-    var callbackFunctions = {
-      disappointed:{
-        callbacks: {},
-      },
-      pay2Win:{
-        callbacks: {},
+      var callbackFunctions = {
+        disappointed: {
+          callbacks: {}
+        },
+        pay2Win: {
+          callbacks: {}
+        }
       }
-    }
-    if (this.#disappointedUsers.length > 0) {
-      this.#disappointedUsers.forEach(user=>{
-        const coordinatesLat = -50.607101021878165
-        const coordinatesLng = 165.97286224365234
-        if(user.username)
-          callbackFunctions.disappointed.callbacks[user['user-id']] = ()=>{this.#game.handleUserGuess(user, {lat: coordinatesLat, lng: coordinatesLng}, false, true, 0, true)}
-      
-      })
-      this.#disappointedUsers = []
-    }
+      if (this.#disappointedUsers.length > 0) {
+        this.#disappointedUsers.forEach((user) => {
+          const coordinatesLat = -50.607101021878165
+          const coordinatesLng = 165.97286224365234
+          if (user.username)
+            callbackFunctions.disappointed.callbacks[user['user-id']] = () => {
+              this.#game.handleUserGuess(
+                user,
+                { lat: coordinatesLat, lng: coordinatesLng },
+                false,
+                true,
+                0,
+                true
+              )
+            }
+        })
+        this.#disappointedUsers = []
+      }
 
-    if (this.#pay2WinUsers.length > 0) {
-      this.#pay2WinUsers.forEach(user=>{
-        // get current round
-        let currentLocation = this.#game.getLocation()
+      if (this.#pay2WinUsers.length > 0) {
+        this.#pay2WinUsers.forEach((user) => {
+          // get current round
+          let currentLocation = this.#game.getLocation()
 
-        const coordinatesLat = currentLocation.lat
-        const coordinatesLng = currentLocation.lng
-        if(user.username)
-          callbackFunctions.pay2Win.callbacks[user['user-id']] = ()=>{this.#game.handleUserGuess(user, {lat: coordinatesLat, lng: coordinatesLng}, false, true, 0, true)}
-      
-      })
-      this.#pay2WinUsers = []
-    }
+          const coordinatesLat = currentLocation.lat
+          const coordinatesLng = currentLocation.lng
+          if (user.username)
+            callbackFunctions.pay2Win.callbacks[user['user-id']] = () => {
+              this.#game.handleUserGuess(
+                user,
+                { lat: coordinatesLat, lng: coordinatesLng },
+                false,
+                true,
+                0,
+                true
+              )
+            }
+        })
+        this.#pay2WinUsers = []
+      }
 
       this.#game.refreshSeed(callbackFunctions).then((roundResults) => {
         if (roundResults && roundResults.location) {
@@ -596,11 +647,11 @@ export default class GameHandler {
         }
       })
       callbackFunctions = {
-        disappointed:{
-          callbacks: {},
+        disappointed: {
+          callbacks: {}
         },
-        pay2Win:{
-          callbacks: {},
+        pay2Win: {
+          callbacks: {}
         }
       }
     })
@@ -666,18 +717,23 @@ export default class GameHandler {
       this.#db.deleteBannedUser(username)
     })
     ipcMain.on('return-my-last-loc', (_event, url: string, username: string) => {
-      console.log("inside backend getting the url: ", url)
-      console.log("this.#backend: ", this.#backend)
-      if(!url || url === ""){
-        this.#backend?.sendMessage(username+': There is no official coverage within 250km of your latest guess.', { system: true })  
-      }
-      else
-        this.#backend?.sendMessage(username+': The closest official coverage to your last guess is: '+url, { system: true })
+      console.log('inside backend getting the url: ', url)
+      console.log('this.#backend: ', this.#backend)
+      if (!url || url === '') {
+        this.#backend?.sendMessage(
+          username + ': There is no official coverage within 250km of your latest guess.',
+          { system: true }
+        )
+      } else
+        this.#backend?.sendMessage(
+          username + ': The closest official coverage to your last guess is: ' + url,
+          { system: true }
+        )
     })
     ipcMain.handle('get-streamer-random-plonk-lat-lng', () => {
       this.#streamerDidRandomPlonk = true
       this.#game.setStreamerDidRandomPlonk(this.#streamerDidRandomPlonk)
-      return getRandomCoordsInLand(this.#game.seed!.bounds);
+      return getRandomCoordsInLand(this.#game.seed!.bounds)
     })
   }
 
@@ -807,8 +863,7 @@ export default class GameHandler {
   }
 
   isUserAllowedToReguessBattleRoyale(userstate: UserData): boolean {
-    if (!settings.isBRMode) 
-      return false
+    if (!settings.isBRMode) return false
     const userId = userstate['user-id']
     if (!userId) return false
 
@@ -824,8 +879,7 @@ export default class GameHandler {
     return true
   }
   revertBattleRoyaleCounter(userstate: UserData): void {
-    if (!settings.isBRMode) 
-      return
+    if (!settings.isBRMode) return
     const userId = userstate['user-id']
     if (!userId) return
 
@@ -839,10 +893,10 @@ export default class GameHandler {
   }
 
   async #handleGuess(userstate: UserData, message: string, isRandomPlonk: boolean = false) {
-    if(settings.isRandomPlonkOnlyMode && !isRandomPlonk) return
-    console.log("inside handleGuess")
-    console.log("userstate: ", userstate)
-    console.log("message: ", message)
+    if (settings.isRandomPlonkOnlyMode && !isRandomPlonk) return
+    console.log('inside handleGuess')
+    console.log('userstate: ', userstate)
+    console.log('message: ', message)
     if (!message.startsWith('!g') || !this.#game.guessesOpen) return
     // Ignore guesses made by the broadcaster with the CG map: prevents seemingly duplicate guesses
     //if (userstate.username?.toLowerCase() === settings.channelName.toLowerCase()) return
@@ -855,20 +909,26 @@ export default class GameHandler {
     try {
       let userIsAllowedToReguessBattleRoyale = this.isUserAllowedToReguessBattleRoyale(userstate)
       let brCounter = 1
-      if(userstate['user-id'])
-        brCounter = this.#battleRoyaleCounter[userstate['user-id']]
-      const guess = await this.#game.handleUserGuess(userstate, location, isRandomPlonk, userIsAllowedToReguessBattleRoyale, brCounter)
+      if (userstate['user-id']) brCounter = this.#battleRoyaleCounter[userstate['user-id']]
+      const guess = await this.#game.handleUserGuess(
+        userstate,
+        location,
+        isRandomPlonk,
+        userIsAllowedToReguessBattleRoyale,
+        brCounter
+      )
 
-      let reguessAllowed = true;
+      let reguessAllowed = true
       if (!this.#game.isMultiGuess && !userIsAllowedToReguessBattleRoyale) {
-        reguessAllowed = false;
+        reguessAllowed = false
       }
       if (!reguessAllowed) {
-        
         this.#win.webContents.send('render-guess', guess)
         if (settings.showHasGuessed) {
           await this.#backend?.sendMessage(
-            settings.messageHasGuessed.replace('<emoji>', getEmoji(guess.player.flag)).replace('<username>', guess.player.username)
+            settings.messageHasGuessed
+              .replace('<emoji>', getEmoji(guess.player.flag))
+              .replace('<username>', guess.player.username)
           )
         }
       } else {
@@ -877,19 +937,23 @@ export default class GameHandler {
         if (!guess.modified) {
           if (settings.showHasGuessed) {
             await this.#backend?.sendMessage(
-              settings.messageHasGuessed.replace('<emoji>', getEmoji(guess.player.flag)).replace('<username>', guess.player.username)
+              settings.messageHasGuessed
+                .replace('<emoji>', getEmoji(guess.player.flag))
+                .replace('<username>', guess.player.username)
             )
           }
         } else {
           if (settings.showGuessChanged) {
             await this.#backend?.sendMessage(
-              settings.messageGuessChanged.replace('<emoji>', getEmoji(guess.player.flag)).replace('<username>', guess.player.username)
+              settings.messageGuessChanged
+                .replace('<emoji>', getEmoji(guess.player.flag))
+                .replace('<username>', guess.player.username)
             )
           }
         }
       }
     } catch (err: any) {
-      console.log("error: ", err)
+      console.log('error: ', err)
       if (err.code === 'alreadyGuessed') {
         if (settings.showHasAlreadyGuessed) {
           await this.#backend?.sendMessage(
@@ -907,116 +971,102 @@ export default class GameHandler {
         console.error(err)
       }
     }
-    if (userstate.username?.toLowerCase() === settings.channelName.toLowerCase()){
+    if (userstate.username?.toLowerCase() === settings.channelName.toLowerCase()) {
       this.#game.getRoundResults()
 
-      return;
+      return
     }
   }
-  generateModeString(): string{
+  generateModeString(): string {
     let returnString = ``
-    if (settings.isClosestInWrongCountryModeActivated)
-      returnString += `wrongCountryOnly: on | `
-    if (settings.exclusiveMode)
-      returnString += `Exclusive Mode: on | `
+    if (settings.isClosestInWrongCountryModeActivated) returnString += `wrongCountryOnly: on | `
+    if (settings.exclusiveMode) returnString += `Exclusive Mode: on | `
     if (settings.isBRMode)
       returnString += `Allowed Guesses in total: ${settings.battleRoyaleReguessLimit} | `
-    if (settings.waterPlonkMode === "mandatory")
-      returnString += `oceanPlonk: mandatory | `
-    if (settings.waterPlonkMode === "illegal")
-      returnString += `oceanPlonk: illegal | `
-    if (settings.invertScoring)
-      returnString += `invertScoring: on | `
-    if (settings.isGameOfChickenModeActivated){
+    if (settings.waterPlonkMode === 'mandatory') returnString += `oceanPlonk: mandatory | `
+    if (settings.waterPlonkMode === 'illegal') returnString += `oceanPlonk: illegal | `
+    if (settings.invertScoring) returnString += `invertScoring: on | `
+    if (settings.isGameOfChickenModeActivated) {
       returnString += `gameOfChicken: on | `
-      if (settings.chickenMode5kGivesPoints){
+      if (settings.chickenMode5kGivesPoints) {
         returnString += `Chicken can 5k: on | `
       }
-      if (settings.chickenModeSurvivesWith5k){
+      if (settings.chickenModeSurvivesWith5k) {
         returnString += `5k avoids chicken: on | `
       }
     }
 
-    if (settings.countdownMode !== "normal"){
-      if(settings.countdownMode === "countdown")
-        returnString += `Countdown | `
-      if(settings.countdownMode === "countup")
-        returnString += `Countup | `
-      if(settings.countdownMode === "alphabeticalAZ")
-        returnString += `Alphabetical A=>Z | `
-      if(settings.countdownMode === "alphabeticalZA")
-        returnString += `Alphabetical Z=>A | `
-      if(settings.countdownMode === "abc")
-        returnString += `ABC-Mode: ${settings.ABCModeLetters.split("").join("").toUpperCase()} | `
+    if (settings.countdownMode !== 'normal') {
+      if (settings.countdownMode === 'countdown') returnString += `Countdown | `
+      if (settings.countdownMode === 'countup') returnString += `Countup | `
+      if (settings.countdownMode === 'alphabeticalAZ') returnString += `Alphabetical A=>Z | `
+      if (settings.countdownMode === 'alphabeticalZA') returnString += `Alphabetical Z=>A | `
+      if (settings.countdownMode === 'abc')
+        returnString += `ABC-Mode: ${settings.ABCModeLetters.split('').join('').toUpperCase()} | `
     }
 
     if (settings.isDartsMode)
-      returnString += `dartsMode: ${settings.dartsTargetScore} ${settings.isDartsModeBust?"bust":""} | `
-    if (returnString === "")
-      returnString = "No special modes activated"
-    return returnString[returnString.length-2] === "|" ? returnString.slice(0, -2) : returnString
+      returnString += `dartsMode: ${settings.dartsTargetScore} ${settings.isDartsModeBust ? 'bust' : ''} | `
+    if (returnString === '') returnString = 'No special modes activated'
+    return returnString[returnString.length - 2] === '|' ? returnString.slice(0, -2) : returnString
   }
 
   #cgCooldown: boolean = false
   #mapCooldown: boolean = false
   async #handleMessage(userstate: UserData, message: string) {
-  /////// custom rewards
-  
+    /////// custom rewards
 
-  if(userstate["custom-reward-id"]){
-    const disappointmentIslandRewardId = 'fdb8170b-f862-4e80-8f4f-6355c8075578'
-    const pay2WinRewardId = 'b1385a52-6523-4405-b4a6-d15f2673626a'
-    const russianRouletteRewardId = '231b8fd6-185e-4297-9565-f92803f0733b'
-    if(userstate["custom-reward-id"] === disappointmentIslandRewardId){
-      // remove non ascii characters
-      let cleanedUsername = message.replace(/[^\x00-\x7F]/g, "")
-      // get rid of @ sign from username
-      cleanedUsername = cleanedUsername.replace("@", "")
-      let disappointedUser = this.#db.getUserByUsername(cleanedUsername)
-      if(disappointedUser){
-        let formated_disappointedUser = {
-          username: disappointedUser.username,
-          'user-id': disappointedUser.id,
-          'display-name': disappointedUser.username,
-          avatar: disappointedUser.avatar? disappointedUser.avatar : "",
+    if (userstate['custom-reward-id']) {
+      const disappointmentIslandRewardId = 'fdb8170b-f862-4e80-8f4f-6355c8075578'
+      const pay2WinRewardId = 'b1385a52-6523-4405-b4a6-d15f2673626a'
+      const russianRouletteRewardId = '231b8fd6-185e-4297-9565-f92803f0733b'
+      if (userstate['custom-reward-id'] === disappointmentIslandRewardId) {
+        // remove non ascii characters
+        let cleanedUsername = message.replace(/[^\x00-\x7F]/g, '')
+        // get rid of @ sign from username
+        cleanedUsername = cleanedUsername.replace('@', '')
+        let disappointedUser = this.#db.getUserByUsername(cleanedUsername)
+        if (disappointedUser) {
+          let formated_disappointedUser = {
+            username: disappointedUser.username,
+            'user-id': disappointedUser.id,
+            'display-name': disappointedUser.username,
+            avatar: disappointedUser.avatar ? disappointedUser.avatar : ''
+          }
+          this.#disappointedUsers.push(formated_disappointedUser)
         }
-        this.#disappointedUsers.push(formated_disappointedUser)
       }
+
+      if (userstate['custom-reward-id'] === pay2WinRewardId) {
+        let pay2WinUser = this.#db.getUserByUsername(userstate['display-name'])
+        if (pay2WinUser) {
+          let formated_pay2WinUser = {
+            username: pay2WinUser.username,
+            'user-id': pay2WinUser.id,
+            'display-name': pay2WinUser.username,
+            avatar: pay2WinUser.avatar ? pay2WinUser.avatar : ''
+          }
+          this.#pay2WinUsers.push(formated_pay2WinUser)
+        }
+      }
+
+      if (userstate['custom-reward-id'] === russianRouletteRewardId) {
+        let russianHitman = this.#db.getUserByUsername(userstate['display-name'])
+        if (russianHitman) {
+          let formated_russianHitman = {
+            username: russianHitman.username,
+            'user-id': russianHitman.id,
+            'display-name': russianHitman.username,
+            avatar: russianHitman.avatar ? russianHitman.avatar : ''
+          }
+          this.#russianHitmans.push(formated_russianHitman)
+        }
+      }
+
+      console.log('custom reward id: ', userstate['custom-reward-id'])
     }
 
-    if(userstate["custom-reward-id"] === pay2WinRewardId){
-      let pay2WinUser = this.#db.getUserByUsername(userstate["display-name"])
-      if(pay2WinUser){
-        let formated_pay2WinUser = {
-          username: pay2WinUser.username,
-          'user-id': pay2WinUser.id,
-          'display-name': pay2WinUser.username,
-          avatar: pay2WinUser.avatar? pay2WinUser.avatar : "",
-        }
-        this.#pay2WinUsers.push(formated_pay2WinUser)
-      }
-    }
-
-    if(userstate["custom-reward-id"] === russianRouletteRewardId){
-      let russianHitman = this.#db.getUserByUsername(userstate["display-name"])
-      if(russianHitman){
-        let formated_russianHitman = {
-          username: russianHitman.username,
-          'user-id': russianHitman.id,
-          'display-name': russianHitman.username,
-          avatar: russianHitman.avatar? russianHitman.avatar : "",
-        }
-        this.#russianHitmans.push(formated_russianHitman)
-      }
-    }
-
-
-
-    console.log("custom reward id: ", userstate["custom-reward-id"])
-  }
-    
-
-  //////////
+    //////////
 
     if (!message.startsWith('!')) return
     if (!userstate['user-id'] || !userstate['display-name']) return
@@ -1111,9 +1161,8 @@ export default class GameHandler {
       return
     }
 
-
     //if (message.split(' ')[0] === settings.mylastlocCmd) {
-    if (message.split(' ')[0].startsWith("!mylastloc")) {
+    if (message.split(' ')[0].startsWith('!mylastloc')) {
       // check if second word is an integer
       const secondWord = message.split(' ')[1]
       let locationNumber = 1
@@ -1140,28 +1189,25 @@ export default class GameHandler {
       this.#win.webContents.send('retrieve-my-last-loc', lastLocation.location, username)
 
       return
-      const streetViewService = new google.maps.StreetViewService();
+      const streetViewService = new google.maps.StreetViewService()
       const request = {
         location: { lat: lastLocation.location.lat, lng: lastLocation.location.lng },
         preference: google.maps.StreetViewPreference.NEAREST, // Set the preference
         radius: 5000 // Search within a 5000-meter radius
-      };
+      }
       streetViewService.getPanorama(request, (data, status) => {
         if (status === 'OK') {
-          console.log('Street View data:', data);
-
+          console.log('Street View data:', data)
         }
       })
     }
 
-    if(message === settings.modeCmd){
+    if (message === settings.modeCmd) {
       if (!this.#game.isInGame || !this.#game.seed || !this.#game.seed.map) {
         return
       }
 
-      await this.#backend?.sendMessage(
-        this.generateModeString()
-      )
+      await this.#backend?.sendMessage(this.generateModeString())
     }
 
     if (message === settings.mapCmd) {
@@ -1176,7 +1222,7 @@ export default class GameHandler {
       const map = await fetchMap(this.#game.seed.map)
       if (map) {
         await this.#backend?.sendMessage(
-          `🌎 Now playing '${map.name}' ${map.creator? `by ${map.creator.nick},`:""} https://geoguessr.com/maps/${map.id} played ${map.numFinishedGames} times with ${map.likes} likes${map.description ? `: ${map.description}` : ''}`
+          `🌎 Now playing '${map.name}' ${map.creator ? `by ${map.creator.nick},` : ''} https://geoguessr.com/maps/${map.id} played ${map.numFinishedGames} times with ${map.likes} likes${map.description ? `: ${map.description}` : ''}`
         )
       }
 
@@ -1243,7 +1289,11 @@ export default class GameHandler {
       if (date?.match(/^\d{8}$/)) {
         endTimestamp = dateInfo.timeStamp + 86400
       }
-      const { streak, victories, perfects, bestRandomPlonk } = this.#db.getBestStats(dateInfo.timeStamp, !settings.includeBroadcasterDataInBest, endTimestamp)
+      const { streak, victories, perfects, bestRandomPlonk } = this.#db.getBestStats(
+        dateInfo.timeStamp,
+        !settings.includeBroadcasterDataInBest,
+        endTimestamp
+      )
       if (!streak && !victories && !perfects && !bestRandomPlonk) {
         await this.#backend?.sendMessage('No stats available.')
       } else {
@@ -1260,12 +1310,11 @@ export default class GameHandler {
         if (bestRandomPlonk) {
           let distance = bestRandomPlonk.distance
           let unit = 'km'
-          let distanceNumber = "0"
+          let distanceNumber = '0'
           if (distance < 1) {
             distanceNumber = (distance * 1000).toFixed(2)
             unit = 'm'
-          }
-          else {
+          } else {
             distanceNumber = distance.toFixed(2)
           }
           msg += `Best Random Plonk: ${bestRandomPlonk.bestRandomPlonk} (${distanceNumber} ${unit}) by ${bestRandomPlonk.username}. `
@@ -1278,8 +1327,6 @@ export default class GameHandler {
       }
       return
     }
-
-
 
     if (message === settings.clearUserStatsCmd) {
       const dbUser = this.#db.getUser(userId)
@@ -1294,14 +1341,14 @@ export default class GameHandler {
       return
     }
 
-    if (message.startsWith(settings.randomPlonkWaterCmd) || message.startsWith("!taquitoplonk")) {
+    if (message.startsWith(settings.randomPlonkWaterCmd) || message.startsWith('!taquitoplonk')) {
       if (!this.#game.isInGame) return
 
-      var { lat, lng } = await getRandomCoordsNotInLand(this.#game.seed!.bounds);
-      if (this.#game.waterPlonkMode === "illegal" && message !== "!taquitoplonk") {
-        const newCoords = await getRandomCoordsInLand(this.#game.seed!.bounds);
-        lat = newCoords.lat;
-        lng = newCoords.lng;
+      var { lat, lng } = await getRandomCoordsNotInLand(this.#game.seed!.bounds)
+      if (this.#game.waterPlonkMode === 'illegal' && message !== '!taquitoplonk') {
+        const newCoords = await getRandomCoordsInLand(this.#game.seed!.bounds)
+        lat = newCoords.lat
+        lng = newCoords.lng
       }
 
       const randomGuess = `!g ${lat}, ${lng}`
@@ -1310,43 +1357,43 @@ export default class GameHandler {
       })
       return
     }
-    if(message.startsWith("!countrycode") && settings.countryRandomPlonkAllowed){
-      this.#backend?.sendMessage("Country codes: https://pastebin.com/raw/xyrvw4R7")
+    if (message.startsWith('!countrycode') && settings.countryRandomPlonkAllowed) {
+      this.#backend?.sendMessage('Country codes: https://pastebin.com/raw/xyrvw4R7')
     }
-        // KEEP THIS AT THE END, BECAUSE OTHERWISE IT MIGHT CONFLICT WITH OTHER COMMANDS LIKE RANDOMPLONKWATER
+    // KEEP THIS AT THE END, BECAUSE OTHERWISE IT MIGHT CONFLICT WITH OTHER COMMANDS LIKE RANDOMPLONKWATER
     // if first chars of message are equal to settings of randomplonkcmd check if it is randomplonkcmd
-    if(message.startsWith(settings.randomPlonkCmd) || message.substring(0,3) == "!rp" || message.substring(0,3) == "!рп"){
-      
-      
-      if(userstate.username === "temp_rsix" || userstate.username === "twitchsmurf_rl")
-        return
+    if (
+      message.startsWith(settings.randomPlonkCmd) ||
+      message.substring(0, 3) == '!rp' ||
+      message.substring(0, 3) == '!рп'
+    ) {
+      if (userstate.username === 'temp_rsix' || userstate.username === 'twitchsmurf_rl') return
       if (!this.#game.isInGame) return
 
-    if(message.indexOf(" ") >= 0){
-      let value = message.split(" ")[1]
-      console.log(`user: ${userstate.username} requested random plonk in country: ${value}`)
-      let isCountryCode = checkCountryCodeValidity(value)
-      if(isCountryCode && settings.countryRandomPlonkAllowed){
-        console.log("country code is valid")
-        const newCoords = await getRandomCoordsInLandByCountryCode(value)
-        if(newCoords.lat == 0 && newCoords.lng == 0){
-          console.log("no country found")
-          this.#backend?.sendMessage("No country found with that code")
+      if (message.indexOf(' ') >= 0) {
+        let value = message.split(' ')[1]
+        console.log(`user: ${userstate.username} requested random plonk in country: ${value}`)
+        let isCountryCode = checkCountryCodeValidity(value)
+        if (isCountryCode && settings.countryRandomPlonkAllowed) {
+          console.log('country code is valid')
+          const newCoords = await getRandomCoordsInLandByCountryCode(value)
+          if (newCoords.lat == 0 && newCoords.lng == 0) {
+            console.log('no country found')
+            this.#backend?.sendMessage('No country found with that code')
+          }
+          const randomGuess = `!g ${newCoords.lat}, ${newCoords.lng}`
+          this.#handleGuess(userstate, randomGuess, false).catch((err) => {
+            console.error(err)
+          })
+          return
         }
-        const randomGuess = `!g ${newCoords.lat}, ${newCoords.lng}`
-        this.#handleGuess(userstate, randomGuess, false).catch((err) => {
-          console.error(err)
-        })
-        return
       }
-    }
 
-
-      var { lat, lng } = await getRandomCoordsInLand(this.#game.seed!.bounds);
-      if (this.#game.waterPlonkMode === "mandatory") {
-        const newCoords = await getRandomCoordsNotInLand(this.#game.seed!.bounds);
-        lat = newCoords.lat;
-        lng = newCoords.lng;
+      var { lat, lng } = await getRandomCoordsInLand(this.#game.seed!.bounds)
+      if (this.#game.waterPlonkMode === 'mandatory') {
+        const newCoords = await getRandomCoordsNotInLand(this.#game.seed!.bounds)
+        lat = newCoords.lat
+        lng = newCoords.lng
       }
 
       const randomGuess = `!g ${lat}, ${lng}`
@@ -1356,115 +1403,103 @@ export default class GameHandler {
       return
     }
 
-    if (message.startsWith("!currentscore")) {
+    if (message.startsWith('!currentscore')) {
       if (!this.#game.isInGame) return
       const currentRoundId = this.#game.getRoundId()
-      if (!currentRoundId){
-        await this.#backend?.sendMessage(
-          `No current round`
-        )
+      if (!currentRoundId) {
+        await this.#backend?.sendMessage(`No current round`)
         return
       }
       const userId = userstate.badges?.broadcaster === '1' ? 'BROADCASTER' : userstate['user-id']
       const currentScore = this.#db.getCurrentGameScore(userId, currentRoundId)
-      if(currentScore === null){
-        await this.#backend?.sendMessage(
-          `Current score ${userstate.username}: 0`
-        )
+      if (currentScore === null) {
+        await this.#backend?.sendMessage(`Current score ${userstate.username}: 0`)
         return
       }
-      await this.#backend?.sendMessage(
-        `Current score ${userstate.username}: ${currentScore}`
-      )
+      await this.#backend?.sendMessage(`Current score ${userstate.username}: ${currentScore}`)
       return
     }
-    
+
     // move commands
-    if(this.#game && this.#game.seed && this.TMPZ){
-      if(userstate.username === "temp_rsix" || userstate.username === "twitchsmurf_rl")
-        return
-      if(!this.#game.seed.forbidMoving){
-        if(userstate && userstate.username){
-          if(!this.#moveCommandTimeKeeper[userstate.username]){
+    if (this.#game && this.#game.seed && this.TMPZ) {
+      if (userstate.username === 'temp_rsix' || userstate.username === 'twitchsmurf_rl') return
+      if (!this.#game.seed.forbidMoving) {
+        if (userstate && userstate.username) {
+          if (!this.#moveCommandTimeKeeper[userstate.username]) {
             this.#moveCommandTimeKeeper[userstate.username] = Date.now()
-          }
-          else{
-            if(Date.now() - this.#moveCommandTimeKeeper[userstate.username] < 5000){
+          } else {
+            if (Date.now() - this.#moveCommandTimeKeeper[userstate.username] < 5000) {
               this.#moveCommandTimeKeeper[userstate.username] = Date.now()
               return
             }
           }
         }
-        if(message.startsWith("!moveforward")){
-          console.log("moveForward command")
+        if (message.startsWith('!moveforward')) {
+          console.log('moveForward command')
           this.#win.webContents.send('move-forward', true)
         }
-        if(message.startsWith("!movebackwards")|| message.startsWith("!movebackward")){
+        if (message.startsWith('!movebackwards') || message.startsWith('!movebackward')) {
           this.#win.webContents.send('move-backward', true)
         }
       }
-      if(!this.#game.seed.forbidRotating){
-        if(message.startsWith("!panleft")){
+      if (!this.#game.seed.forbidRotating) {
+        if (message.startsWith('!panleft')) {
           let degrees = 45
-          if(message.indexOf(" ") > 0){
-            let value = message.split(" ")[1]
-            if(!isNaN(Number(value))){
+          if (message.indexOf(' ') > 0) {
+            let value = message.split(' ')[1]
+            if (!isNaN(Number(value))) {
               degrees = parseInt(value)
             }
           }
           this.#win.webContents.send('pan-left', degrees)
         }
-        if(message.startsWith("!panright")){
+        if (message.startsWith('!panright')) {
           let degrees = 45
-          if(message.indexOf(" ") > 0){
-            let value = message.split(" ")[1]
-            if(!isNaN(Number(value))){
+          if (message.indexOf(' ') > 0) {
+            let value = message.split(' ')[1]
+            if (!isNaN(Number(value))) {
               degrees = parseInt(value)
             }
           }
           this.#win.webContents.send('pan-right', degrees)
-          
         }
-        if(message.startsWith("!panup")){
+        if (message.startsWith('!panup')) {
           let degrees = 45
-          if(message.indexOf(" ") > 0){
-            let value = message.split(" ")[1]
-            if(!isNaN(Number(value))){
+          if (message.indexOf(' ') > 0) {
+            let value = message.split(' ')[1]
+            if (!isNaN(Number(value))) {
               degrees = parseInt(value)
             }
           }
           this.#win.webContents.send('pan-up', degrees)
-          
         }
-        if(message.startsWith("!pandown")){
+        if (message.startsWith('!pandown')) {
           let degrees = 45
-          if(message.indexOf(" ") > 0){
-            let value = message.split(" ")[1]
-            if(!isNaN(Number(value))){
+          if (message.indexOf(' ') > 0) {
+            let value = message.split(' ')[1]
+            if (!isNaN(Number(value))) {
               degrees = parseInt(value)
             }
           }
           this.#win.webContents.send('pan-down', degrees)
-          
         }
       }
-      if(!this.#game.seed.forbidZooming){
-
-        if(message.startsWith("!zoomin")){
+      if (!this.#game.seed.forbidZooming) {
+        if (message.startsWith('!zoomin')) {
           let zoomValue = 1
-          if(message.indexOf(" ") > 0){
-            let value = message.split(" ")[1]
-            if(!isNaN(Number(value))){
+          if (message.indexOf(' ') > 0) {
+            let value = message.split(' ')[1]
+            if (!isNaN(Number(value))) {
               zoomValue = parseInt(value)
             }
           }
           this.#win.webContents.send('zoom-in', zoomValue)
         }
-        if(message.startsWith("!zoomout")){
+        if (message.startsWith('!zoomout')) {
           let zoomValue = 1
-          if(message.indexOf(" ") > 0){
-            let value = message.split(" ")[1]
-            if(!isNaN(Number(value))){
+          if (message.indexOf(' ') > 0) {
+            let value = message.split(' ')[1]
+            if (!isNaN(Number(value))) {
               zoomValue = parseInt(value)
             }
           }
@@ -1472,8 +1507,6 @@ export default class GameHandler {
         }
       }
     }
-
-
 
     // streamer commands
     if (process.env.NODE_ENV !== 'development' || userstate.badges?.broadcaster !== '1') return
@@ -1506,7 +1539,9 @@ export default class GameHandler {
 
   isUserBanned(username: string) {
     const bannedUsers = this.#db.getBannedUsers()
-    const isBanned = bannedUsers.some((user) => user.username.toLowerCase() === username.toLowerCase())
+    const isBanned = bannedUsers.some(
+      (user) => user.username.toLowerCase() === username.toLowerCase()
+    )
     return isBanned
   }
 }

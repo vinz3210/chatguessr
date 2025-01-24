@@ -52,7 +52,6 @@ export const chatguessrApi = {
   },
   returnMyLastLoc(url: string, username: string): void {
     ipcRenderer.send('return-my-last-loc', url, username)
-
   },
 
   appDataPathExists(subdir?: string): Promise<string | false> {
@@ -67,6 +66,7 @@ export const chatguessrApi = {
     callback: (
       isMultiGuess: boolean,
       isBRMode: boolean,
+      showRandomPlonkButton: boolean,
       modeHelp: string[],
       restoredGuesses: RoundResult[] | Player[],
       location: Location_
@@ -110,7 +110,7 @@ export const chatguessrApi = {
   onZoomOut(callback: (value) => void) {
     return ipcRendererOn('zoom-out', callback)
   },
-  onRetrieveMyLastLoc(callback: (location: Location_, username:string) => void) {
+  onRetrieveMyLastLoc(callback: (location: Location_, username: string) => void) {
     return ipcRendererOn('retrieve-my-last-loc', callback)
   },
   onShowRoundResults(
@@ -136,7 +136,7 @@ export const chatguessrApi = {
     return ipcRendererOn('refreshed-in-game', callback)
   },
   sendPano(pano: string): void {
-    console.log("about to send pano", pano)
+    console.log('about to send pano', pano)
     ipcRenderer.send('send-pano', pano)
   },
 
@@ -162,11 +162,10 @@ export const chatguessrApi = {
 
   getTwitchConnectionState(): Promise<TwitchConnectionState> {
     return ipcRenderer.invoke('get-twitch-connection-state')
-  }, 
+  },
   getRandomPlonkLatLng(): Promise<LatLng> {
     return ipcRenderer.invoke('get-streamer-random-plonk-lat-lng')
   },
-
 
   onTwitchConnectionStateChange(callback: (state: TwitchConnectionState) => void) {
     return ipcRendererOn('twitch-connection-state', callback)
