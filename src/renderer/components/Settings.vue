@@ -32,6 +32,20 @@
           Only Randomplonks
           <input v-model="settings.isRandomPlonkOnlyMode" type="checkbox" />
         </label>
+
+        <label 
+          class="form__group" 
+          data-tip="The button is shown on the right menu during games. Clicking the button will end the round and make a random guess for the streamer"
+        >
+          Show streamer random plonk button during rounds
+          <input v-model="settings.showStreamerRandomPlonkButton" type="checkbox" @change="(e) => {
+            const target = e.target as HTMLInputElement | null;
+            if (target) {
+              setShowRandomPlonkButton(target.checked);
+            }
+          }"/>
+          </label>
+
       </div>
       <hr />
 
@@ -594,9 +608,10 @@ import IconTwitch from '@/assets/icons/twitch.svg'
 const { chatguessrApi } = window
 const { copy, copied } = useClipboard()
 
-const { socketConnectionState, twitchConnectionState } = defineProps<{
+const { socketConnectionState, twitchConnectionState, setShowRandomPlonkButton } = defineProps<{
   twitchConnectionState: TwitchConnectionState
   socketConnectionState: SocketConnectionState
+  setShowRandomPlonkButton: (showButton: boolean) => void 
 }>()
 
 function isLetter(e) {

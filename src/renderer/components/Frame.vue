@@ -61,7 +61,7 @@
     <button
       class="cg-button"
       title="Randomplonk for Streamer"
-      :hidden="gameState === 'none'"
+      :hidden="gameState === 'none' || !showRandomPlonkButton"
       @click="onStreamerRandomplonk"
     >
       <IconDice v-if="widgetVisibility.scoreboardAndGgInterfaceVisible" />
@@ -80,7 +80,7 @@
 
   <Suspense>
     <Modal :is-visible="settingsVisible" @close="settingsVisible = false">
-      <Settings :socket-connection-state :twitch-connection-state />
+      <Settings :socket-connection-state :twitch-connection-state :set-show-random-plonk-button="setShowRandomPlonkButton"/>
     </Modal>
   </Suspense>
 
@@ -134,6 +134,10 @@ const currentLocation = shallowRef<LatLng | null>(null)
 const gameResultLocations = shallowRef<Location_[] | null>(null)
 var MWStreetViewInstance
 
+const showRandomPlonkButton = shallowRef<boolean>(true)
+const setShowRandomPlonkButton = (value: boolean) => {
+  showRandomPlonkButton.value = value;
+};
 
 // Make sure game mode is not set to 'challenge'
 setLocalStorage('quickplay-playtype', 'single')
@@ -221,14 +225,13 @@ watch(
 )
 
 onBeforeUnmount(
-  chatguessrApi.onGameStarted((_isMultiGuess, _isBRMode, _modeHelp, restoredGuesses, location) => {
+  chatguessrApi.onGameStarted((_isMultiGuess, _isBRMode, _showRandomPlonkButton, _modeHelp, restoredGuesses, location) => {
     isMultiGuess.value = _isMultiGuess
     isBRMode.value = _isBRMode
     console.log("isBRMode", isBRMode.value)
     modeHelp.value = _modeHelp
     gameState.value = 'in-round'
-    
-
+    showRandomPlonkButton.value = _showRandomPlonkButton
 
     currentLocation.value = location
     if (satelliteMode.value.enabled) {
