@@ -33,7 +33,7 @@ watch(() => props.isVisible, (isVisible) => {
     }, (data, status) => {
       if (status === 'OK' && data && data.location && data.location.pano && panorama.value) {
         if (!panoramaInstance.value) {
-          panoramaInstance.value = new google.maps.StreetViewPanorama(panorama.value, {
+          panoramaInstance.value = new window.OriginalStreetViewPanorama(panorama.value, {
             addressControl: false,
             showRoadLabels: false,
           });

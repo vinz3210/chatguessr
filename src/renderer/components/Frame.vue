@@ -366,6 +366,7 @@ declare global {
   interface Window {
     initialize: () => void;
     showClosestLocationModal: (loc: LatLng) => void;
+    OriginalStreetViewPanorama: typeof google.maps.StreetViewPanorama;
   }
 }
 onBeforeUnmount(
@@ -823,6 +824,7 @@ function injecterCallback(overrider)
  
 
   injecter(() => {
+    window.OriginalStreetViewPanorama = google.maps.StreetViewPanorama;
     google.maps.StreetViewPanorama = class extends google.maps.StreetViewPanorama {
       constructor(...args: any[]) {
           super(...args as [any, ...any[]]);
