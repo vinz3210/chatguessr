@@ -121,7 +121,7 @@ export default class GameHandler {
         setTimeout(() => {
           this.#win.webContents.send('pick-next-map', this.#nextMapUrl)
           this.#nextMapUrl = null
-        }, 10 * 1000)
+        }, 1.5 * 1000)
       }
     } else {
       this.#win.webContents.send('next-round', this.#game.isMultiGuess, this.#game.getLocation())
