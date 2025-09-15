@@ -89,6 +89,9 @@ export const chatguessrApi = {
     return ipcRendererOn('game-quitted', callback)
   },
 
+  onPickNextMap: (callback: (mapId: string) => void) =>
+    ipcRenderer.on('pick-next-map', (_event, mapId) => callback(mapId)),
+
   onReceiveGuess(callback: (guess: Guess) => void) {
     return ipcRendererOn('render-guess', callback)
   },

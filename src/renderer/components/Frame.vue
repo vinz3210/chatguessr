@@ -279,8 +279,7 @@ function runMutationHandler(mutations: MutationRecord[] | null) {
 }
 
 const newGameObserver = new MutationObserver((mutations) => {
-  // When triggered, first navigate to the next map
-  pickNextMap()
+
 
   // Wait for navigation/load to complete, then run the original logic.
   // Use the 'load' event on window to detect when the new page is loaded. If already loaded,
@@ -681,6 +680,24 @@ onBeforeUnmount(
     rendererApi.clearMarkers()
   })
 )
+
+let pickNextMapUnsub: (() => void) | null = null;
+
+onMounted(() => {
+  const maybeUnsub = (chatguessrApi.onPickNextMap as any)((mapId: string) => {
+    pickNextMap(mapId)
+  })
+  if (typeof maybeUnsub === 'function') {
+    pickNextMapUnsub = maybeUnsub
+  }
+})
+
+onBeforeUnmount(() => {
+  if (pickNextMapUnsub) {
+    pickNextMapUnsub()
+    pickNextMapUnsub = null
+  }
+})
 
 onBeforeUnmount(
   chatguessrApi.onReceiveGuess((guess) => {
