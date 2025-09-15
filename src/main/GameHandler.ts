@@ -605,7 +605,7 @@ export default class GameHandler {
 
             this.openGuesses()
             setTimeout(() => {
-              this.#backend?.sendMessage(`Use !map to get the map link`, { system: true })
+              this.#sendMapInfo()
             }, 15 * 1000)
           })
           .catch((err) => {
@@ -1082,6 +1082,18 @@ export default class GameHandler {
     return returnString[returnString.length-2] === "|" ? returnString.slice(0, -2) : returnString
   }
 
+  async #sendMapInfo() {
+    if (!this.#game.isInGame || !this.#game.seed || !this.#game.seed.map) {
+      return
+    }
+    const map = await fetchMap(this.#game.seed.map)
+    if (map) {
+      await this.#backend?.sendMessage(
+        `🌎 Now playing '${map.name}' ${map.creator? `by ${map.creator.nick},`:""} https://geoguessr.com/maps/${map.id} played ${map.numFinishedGames} times with ${map.likes} likes${map.description ? `: ${map.description}` : ''}`
+      )
+    }
+  }
+
   #cgCooldown: boolean = false
   #mapCooldown: boolean = false
   async #handleMessage(userstate: UserData, message: string) {
@@ -1302,20 +1314,11 @@ export default class GameHandler {
     }
 
     if (message === settings.mapCmd) {
-      // We'll only have a map ID if we're
-      if (!this.#game.isInGame || !this.#game.seed || !this.#game.seed.map) {
-        return
-      }
       // Allow the broadcaster to circumvent the cooldown
       if (this.#mapCooldown && userId !== 'BROADCASTER') return
       this.#mapCooldown = true
 
-      const map = await fetchMap(this.#game.seed.map)
-      if (map) {
-        await this.#backend?.sendMessage(
-          `🌎 Now playing '${map.name}' ${map.creator? `by ${map.creator.nick},`:""} https://geoguessr.com/maps/${map.id} played ${map.numFinishedGames} times with ${map.likes} likes${map.description ? `: ${map.description}` : ''}`
-        )
-      }
+      await this.#sendMapInfo()
 
       setTimeout(() => {
         this.#mapCooldown = false
