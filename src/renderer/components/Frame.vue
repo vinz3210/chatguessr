@@ -431,8 +431,9 @@ async function rotationFunction(){
 
 onBeforeUnmount(
   chatguessrApi.onStartRound(async() => {
-    await handleTryAgain()
-        // console.log all settings
+    setTimeout(async () => {
+      await handleTryAgain()
+    }, 2000);
     gameState.value = 'in-round'
     rendererApi.clearMarkers()
     scoreboard.value!.onStartRound()

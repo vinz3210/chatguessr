@@ -37,6 +37,8 @@
 	{"name":"A Flooded World","URL":"60cb88abcdf6930001c86edc","weight":10,"creator":"Chicago Geographer", "NMPZ":true},
 	{"name":"GeoTime","URL":"63c23ec9563ddfcf1b8cd67e","weight":25,"creator":"Steve", "NMPZ":true},
 	{"name":"A Coastal World","URL":"677840f97a79b83d944b9011","weight":10,"creator":"TheStBlaine", "NMPZ":true},
+	{"name":"A Dynamic Nighttime World","URL":"687aa9e92b059901e1078af1","weight":25,"creator":"Calle", "NMPZ":true},
+	{"name":"A Dynamic Daytime World","URL":"6872c3c80d1eee7c9eed1d79","weight":25,"creator":"Calle", "NMPZ":true},
 	{"name":"A World Trekker Adventure","URL":"67a27ee6d655a9963f465cec","weight":10,"creator":"TheStBlaine", "NMPZ":true},
 	{"name":"A Rainbolt World","URL":"65c86935d327035509fd616f","weight":10,"creator":"slashP", "NMPZ":true}
 ]
