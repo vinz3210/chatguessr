@@ -63,6 +63,7 @@ export default class GameHandler {
   #mapVotation: Array<{ name: string; URL: string; weight?: number; creator?: string; NMPZ?: boolean; emote: string }> = []
 	#mapVotes: Map<string, string> = new Map()
   #votingTimeout: NodeJS.Timeout | null = null
+  #nextMapUrl: string | null = null
   
   TMPZ: boolean
 
@@ -116,6 +117,12 @@ export default class GameHandler {
       let winner = await this.#showGameResults()
       this.#game.setGameWinner(winner)
 
+      if (this.#nextMapUrl) {
+        setTimeout(() => {
+          this.#win.webContents.send('pick-next-map', this.#nextMapUrl)
+          this.#nextMapUrl = null
+        }, 10 * 1000)
+      }
     } else {
       this.#win.webContents.send('next-round', this.#game.isMultiGuess, this.#game.getLocation())
       if(settings.showRoundStarted && !isRestartClick)
@@ -183,7 +190,7 @@ export default class GameHandler {
     if (winningEntry) {
       await this.#backend?.sendMessage(`The winning map is ${winningEntry.name}!`, { system: true })
       if (winningEntry.URL) {
-        this.#win.webContents.send('pick-next-map', winningEntry.URL)
+        this.#nextMapUrl = winningEntry.URL
       }
     }
   }
