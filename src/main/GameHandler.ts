@@ -148,7 +148,7 @@ export default class GameHandler {
 		}
 
 		await this.#backend?.sendMessage(
-			`A vote for the next map has started! You have 2.5 minutes to vote for one of the following maps:`,
+			`A vote for the next map has started! You have 2.5 minutes to vote for one of the following maps by sending the Emote in chat:`,
 			{ system: true }
 		)
 		this.#mapVotation.forEach(async (map) => {
