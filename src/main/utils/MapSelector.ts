@@ -50,11 +50,24 @@ export default class MapSelector {
         // each of the maps has a weight attribute, which is used to determine the probability of the map being selected
         // select 5 maps at random, with the probability of each map being selected being proportional to its weight
         // return the list of selected maps
+
+        this.getOnlineMapList().then(mapList => {
+            this.#onlineMapList = mapList;
+            if(this.#onlineMapList.length > 0){
+                this.#mapList = this.#onlineMapList;
+            }
+        }).catch(() => {
+            // stick with default map list
+        });
+        
+        
         let mapSample: any[] = [];
         let totalWeight = 0;
         let mapWeights: number[] = [];
         let mapList = this.#mapList;
         console.log("mapList", this.#mapList);
+        
+
 
         // calculate the total weight
         for(let map of mapList){
@@ -75,11 +88,6 @@ export default class MapSelector {
             }
         }
 
-        // for each map in the sample list, remove it from the mapList
-        for(let map of mapSample){
-            let index = mapList.indexOf(map);
-            mapList.splice(index, 1);
-        }
 
         // for each of the maps in the sample list check if the map exists
         // if the map does not exist, remove it from the sample list
