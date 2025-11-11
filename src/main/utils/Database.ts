@@ -202,6 +202,16 @@ const customMigrations: ((db: SQLite.Database) => void)[] = [
   function createGameWinner(db){
     db.prepare(`ALTER TABLE games ADD COLUMN game_winner TEXT DEFAULT NULL`).run()
   }
+  ,
+  function restorePreviousGuess(db) {
+    // Add back the previous_guess column for compatibility with older code that still references it.
+    // This is additive and safe: if the column already exists the ALTER will throw, so we guard it.
+    try {
+      db.prepare(`ALTER TABLE users ADD COLUMN previous_guess TEXT DEFAULT NULL`).run()
+    } catch (err) {
+      // If the column already exists or SQLite doesn't support ALTER in this context, ignore the error.
+    }
+  }
 ]
 
 class db {
