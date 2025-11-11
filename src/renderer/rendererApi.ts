@@ -3,6 +3,12 @@ import { getLocalStorage, setLocalStorage } from './useLocalStorage'
 let globalMap: google.maps.Map | undefined = undefined
 const mapReady = hijackMap()
 
+let onMapTypeChangedCallback: ((mapTypeId: string) => void) | undefined = undefined
+
+function setOnMapTypeChangedCallback(callback: (mapTypeId: string) => void) {
+  onMapTypeChangedCallback = callback
+}
+
 let guessMarkers: google.maps.marker.AdvancedMarkerElement[] = []
 let polylines: google.maps.Polyline[] = []
 
@@ -313,6 +319,10 @@ async function hijackMap() {
 
         const osmMapType = new google.maps.ImageMapType({
           getTileUrl: function (coord, zoom) {
+            const openTopo = getLocalStorage('cg_openTopo', false)
+            if (openTopo) {
+              return 'https://b.tile.opentopomap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png'
+            }
             return 'https://tile.openstreetmap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png'
           },
           tileSize: new google.maps.Size(256, 256),
@@ -327,8 +337,12 @@ async function hijackMap() {
           }
         })
         this.addListener('maptypeid_changed', () => {
+          const mapTypeId = this.getMapTypeId()
           // Save the map type ID so we can prevent GeoGuessr from resetting it
-          setLocalStorage('cg_MapTypeId', this.getMapTypeId())
+          setLocalStorage('cg_MapTypeId', mapTypeId)
+          if (onMapTypeChangedCallback) {
+            onMapTypeChangedCallback(mapTypeId)
+          }
         })
       }
 
@@ -336,12 +350,19 @@ async function hijackMap() {
         // GeoGuessr's `setOptions` calls always include `backgroundColor`
         // so this is how we can distinguish between theirs and ours
         if (opts.backgroundColor) {
-          opts.mapTypeId = getLocalStorage('cg_MapTypeId', opts.mapTypeId)
+          const mapTypeId = getLocalStorage('cg_MapTypeId', opts.mapTypeId)
+          const satelliteHybrid = getLocalStorage('cg_satelliteHybrid', false)
+
+          if (mapTypeId === 'satellite' && satelliteHybrid) {
+            opts.mapTypeId = google.maps.MapTypeId.HYBRID
+          } else {
+            opts.mapTypeId = mapTypeId
+          }
+
           opts.mapTypeControl = true
           opts.mapTypeControlOptions = {
             mapTypeIds: [
               google.maps.MapTypeId.ROADMAP,
-              google.maps.MapTypeId.TERRAIN,
               google.maps.MapTypeId.SATELLITE,
               'osm'
             ],
@@ -355,6 +376,13 @@ async function hijackMap() {
   })
 }
 
+function reloadMap() {
+  if (!globalMap) return
+  const mapTypeId = globalMap.getMapTypeId()
+  globalMap.setMapTypeId(null)
+  globalMap.setMapTypeId(mapTypeId)
+}
+
 export const rendererApi = {
   drawRoundResults,
   drawPlayerResults,
@@ -362,5 +390,7 @@ export const rendererApi = {
   clearMarkers,
   showSatelliteMap,
   hideSatelliteMap,
-  centerSatelliteView
+  centerSatelliteView,
+  reloadMap,
+  setOnMapTypeChangedCallback
 }
