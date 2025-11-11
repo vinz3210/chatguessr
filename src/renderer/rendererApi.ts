@@ -310,6 +310,17 @@ async function hijackMap() {
     google.maps.Map = class extends google.maps.Map {
       constructor(mapDiv: HTMLElement, opts: google.maps.MapOptions) {
         super(mapDiv, opts)
+
+        const osmMapType = new google.maps.ImageMapType({
+          getTileUrl: function (coord, zoom) {
+            return 'https://tile.openstreetmap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png'
+          },
+          tileSize: new google.maps.Size(256, 256),
+          name: 'OpenStreetMap',
+          maxZoom: 18
+        })
+        this.mapTypes.set('osm', osmMapType)
+
         this.addListener('idle', () => {
           if (globalMap == null) {
             onMapUpdate(this)
@@ -328,6 +339,12 @@ async function hijackMap() {
           opts.mapTypeId = getLocalStorage('cg_MapTypeId', opts.mapTypeId)
           opts.mapTypeControl = true
           opts.mapTypeControlOptions = {
+            mapTypeIds: [
+              google.maps.MapTypeId.ROADMAP,
+              google.maps.MapTypeId.TERRAIN,
+              google.maps.MapTypeId.SATELLITE,
+              'osm'
+            ],
             style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
             position: google.maps.ControlPosition.TOP_RIGHT
           }
