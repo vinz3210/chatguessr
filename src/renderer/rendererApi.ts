@@ -3,12 +3,6 @@ import { getLocalStorage, setLocalStorage } from './useLocalStorage'
 let globalMap: google.maps.Map | undefined = undefined
 const mapReady = hijackMap()
 
-let onMapTypeChangedCallback: ((mapTypeId: string) => void) | undefined = undefined
-
-function setOnMapTypeChangedCallback(callback: (mapTypeId: string) => void) {
-  onMapTypeChangedCallback = callback
-}
-
 let guessMarkers: google.maps.marker.AdvancedMarkerElement[] = []
 let polylines: google.maps.Polyline[] = []
 
@@ -306,11 +300,57 @@ async function hijackMap() {
       try {
         if (!isGamePage()) return
         globalMap = map
+        createCustomCheckbox(map, 'cg_satelliteHybrid', 'Hybrid', 'satellite')
+        createCustomCheckbox(map, 'cg_openTopo', 'OpenTopo', 'osm')
         resolve()
       } catch (err) {
         console.error('GeoguessrHijackMap Error:', err)
         reject(err)
       }
+    }
+
+    function createCustomCheckbox(
+      map: google.maps.Map,
+      storageKey: string,
+      labelText: string,
+      mapTypeId: string
+    ) {
+      const checkboxWrapper = document.createElement('div')
+      const checkbox = document.createElement('input')
+      const label = document.createElement('label')
+
+      checkboxWrapper.style.backgroundColor = 'rgb(37, 40, 42)'
+      checkboxWrapper.style.padding = '5px'
+      checkboxWrapper.style.display = 'none'
+      checkboxWrapper.style.color = 'white'
+      checkboxWrapper.style.fontSize = '12px'
+      checkboxWrapper.style.fontWeight = '500'
+
+      checkbox.type = 'checkbox'
+      checkbox.checked = getLocalStorage(storageKey, false)
+      checkbox.id = storageKey
+
+      label.htmlFor = storageKey
+      label.innerText = labelText
+
+      checkboxWrapper.appendChild(checkbox)
+      checkboxWrapper.appendChild(label)
+
+      map.controls[google.maps.ControlPosition.TOP_RIGHT].push(checkboxWrapper)
+
+      checkbox.addEventListener('change', () => {
+        setLocalStorage(storageKey, checkbox.checked)
+        reloadMap()
+      })
+
+      map.addListener('maptypeid_changed', () => {
+        const currentMapTypeId = map.getMapTypeId()
+        if (currentMapTypeId === mapTypeId || (mapTypeId === 'satellite' && currentMapTypeId === 'hybrid')) {
+          checkboxWrapper.style.display = 'block'
+        } else {
+          checkboxWrapper.style.display = 'none'
+        }
+      })
     }
 
     google.maps.Map = class extends google.maps.Map {
@@ -340,9 +380,7 @@ async function hijackMap() {
           const mapTypeId = this.getMapTypeId()
           // Save the map type ID so we can prevent GeoGuessr from resetting it
           setLocalStorage('cg_MapTypeId', mapTypeId)
-          if (onMapTypeChangedCallback) {
-            onMapTypeChangedCallback(mapTypeId)
-          }
+          reloadMap()
         })
       }
 
@@ -350,24 +388,10 @@ async function hijackMap() {
         // GeoGuessr's `setOptions` calls always include `backgroundColor`
         // so this is how we can distinguish between theirs and ours
         if (opts.backgroundColor) {
-          const mapTypeId = getLocalStorage('cg_MapTypeId', opts.mapTypeId)
-          const satelliteHybrid = getLocalStorage('cg_satelliteHybrid', false)
-
-          if (mapTypeId === 'satellite' && satelliteHybrid) {
-            opts.mapTypeId = google.maps.MapTypeId.HYBRID
-          } else {
-            opts.mapTypeId = mapTypeId
-          }
-
-          opts.mapTypeControl = true
+          opts.mapTypeId = getLocalStorage('cg_MapTypeId', opts.mapTypeId)
           opts.mapTypeControlOptions = {
-            mapTypeIds: [
-              google.maps.MapTypeId.ROADMAP,
-              google.maps.MapTypeId.SATELLITE,
-              'osm'
-            ],
-            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-            position: google.maps.ControlPosition.TOP_RIGHT
+            ...opts.mapTypeControlOptions,
+            mapTypeIds: [...(opts.mapTypeControlOptions?.mapTypeIds || []), 'osm']
           }
         }
         super.setOptions(opts)
@@ -378,9 +402,16 @@ async function hijackMap() {
 
 function reloadMap() {
   if (!globalMap) return
-  const mapTypeId = globalMap.getMapTypeId()
-  globalMap.setMapTypeId(null)
-  globalMap.setMapTypeId(mapTypeId)
+  const mapTypeId = getLocalStorage('cg_MapTypeId', 'roadmap')
+  const satelliteHybrid = getLocalStorage('cg_satelliteHybrid', false)
+
+  if (mapTypeId === 'satellite' && satelliteHybrid) {
+    globalMap.setMapTypeId(google.maps.MapTypeId.HYBRID)
+  } else {
+    // This is a bit of a hack to force a refresh of the custom tiles
+    globalMap.setMapTypeId('roadmap')
+    globalMap.setMapTypeId(mapTypeId)
+  }
 }
 
 export const rendererApi = {
@@ -391,6 +422,5 @@ export const rendererApi = {
   showSatelliteMap,
   hideSatelliteMap,
   centerSatelliteView,
-  reloadMap,
-  setOnMapTypeChangedCallback
+  reloadMap
 }

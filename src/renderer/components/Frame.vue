@@ -87,38 +87,6 @@
     >
       <IconEyeShut />
     </button>
-
-    <div
-      :hidden="currentMap !== 'osm'"
-      style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        background: rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        border-radius: 10px;
-        padding: 5px;
-      "
-    >
-      <label for="openTopo" style="color: white; font-size: 0.8rem">OpenTopo</label>
-      <input id="openTopo" v-model="openTopo" type="checkbox" />
-    </div>
-
-    <div
-      :hidden="currentMap !== 'satellite'"
-      style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        background: rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        border-radius: 10px;
-        padding: 5px;
-      "
-    >
-      <label for="satelliteHybrid" style="color: white; font-size: 0.8rem">Hybrid</label>
-      <input id="satelliteHybrid" v-model="satelliteHybrid" type="checkbox" />
-    </div>
   </div>
 
   <Suspense>
@@ -174,27 +142,6 @@ const modeHelp = shallowRef<string[]>([])
 const guessMarkersLimit = shallowRef<number | null>(null)
 const currentLocation = shallowRef<LatLng | null>(null)
 const gameResultLocations = shallowRef<Location_[] | null>(null)
-
-const openTopo = shallowRef(getLocalStorage('cg_openTopo', false))
-const currentMap = shallowRef(getLocalStorage('cg_MapTypeId', 'roadmap'))
-
-watch(openTopo, () => {
-  setLocalStorage('cg_openTopo', openTopo.value)
-  // Force a reload of the map
-  if (currentMap.value === 'osm') {
-    rendererApi.reloadMap()
-  }
-})
-
-const satelliteHybrid = shallowRef(getLocalStorage('cg_satelliteHybrid', false))
-
-watch(satelliteHybrid, () => {
-  setLocalStorage('cg_satelliteHybrid', satelliteHybrid.value)
-  // Force a reload of the map
-  if (currentMap.value === 'satellite') {
-    rendererApi.reloadMap()
-  }
-})
 
 var MWStreetViewInstance
 let spinInterval: NodeJS.Timeout | null = null
@@ -299,12 +246,6 @@ async function showRandomMultiMessageInScoreboard(){
       })
   })
 }
-
-onMounted(() => {
-  rendererApi.setOnMapTypeChangedCallback((mapTypeId) => {
-    currentMap.value = mapTypeId
-  })
-})
 
 onBeforeUnmount(
   chatguessrApi.onGameStarted(async(_isMultiGuess, _isBRMode, _modeHelp, restoredGuesses, location) => {
