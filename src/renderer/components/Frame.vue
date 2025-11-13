@@ -250,7 +250,6 @@ async function showRandomMultiMessageInScoreboard(){
 onBeforeUnmount(
   chatguessrApi.onGameStarted(async(_isMultiGuess, _isBRMode, _modeHelp, restoredGuesses, location) => {
     
-
     isMultiGuess.value = _isMultiGuess
     isBRMode.value = _isBRMode
     console.log("isBRMode", isBRMode.value)

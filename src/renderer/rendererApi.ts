@@ -300,6 +300,8 @@ async function hijackMap() {
       try {
         if (!isGamePage()) return
         globalMap = map
+        createCustomCheckbox(map, 'cg_satelliteHybrid', 'Hybrid', 'satellite')
+        createCustomCheckbox(map, 'cg_openTopo', 'OpenTopo', 'osm')
         resolve()
       } catch (err) {
         console.error('GeoguessrHijackMap Error:', err)
@@ -307,17 +309,85 @@ async function hijackMap() {
       }
     }
 
+    function createCustomCheckbox(
+      map: google.maps.Map,
+      storageKey: string,
+      labelText: string,
+      mapTypeId: string
+    ) {
+      const checkboxWrapper = document.createElement('div')
+      const checkbox = document.createElement('input')
+      const label = document.createElement('label')
+
+      checkboxWrapper.style.backgroundColor = 'rgb(37, 40, 42)'
+      checkboxWrapper.style.padding = '5px'
+      const currentMapTypeId = map.getMapTypeId()
+      if (currentMapTypeId === mapTypeId || (mapTypeId === 'satellite' && currentMapTypeId === 'hybrid')) {
+        checkboxWrapper.style.display = 'block'
+      } else {
+        checkboxWrapper.style.display = 'none'
+      }
+      checkboxWrapper.style.color = 'white'
+      checkboxWrapper.style.fontSize = '12px'
+      checkboxWrapper.style.fontWeight = '500'
+
+      checkbox.type = 'checkbox'
+      checkbox.checked = getLocalStorage(storageKey, false)
+      checkbox.id = storageKey
+
+      label.htmlFor = storageKey
+      label.innerText = labelText
+
+      checkboxWrapper.appendChild(checkbox)
+      checkboxWrapper.appendChild(label)
+
+      map.controls[google.maps.ControlPosition.TOP_RIGHT].push(checkboxWrapper)
+
+      checkbox.addEventListener('change', () => {
+        setLocalStorage(storageKey, checkbox.checked)
+        reloadMap()
+      })
+
+      map.addListener('maptypeid_changed', () => {
+        const currentMapTypeId = map.getMapTypeId()
+        if (currentMapTypeId === mapTypeId || (mapTypeId === 'satellite' && currentMapTypeId === 'hybrid')) {
+          checkboxWrapper.style.display = 'block'
+        } else {
+          checkboxWrapper.style.display = 'none'
+        }
+      })
+    }
+
     google.maps.Map = class extends google.maps.Map {
       constructor(mapDiv: HTMLElement, opts: google.maps.MapOptions) {
         super(mapDiv, opts)
+
+        const osmMapType = new google.maps.ImageMapType({
+          getTileUrl: function (coord, zoom) {
+            const openTopo = getLocalStorage('cg_openTopo', false)
+            if (openTopo) {
+              return 'https://b.tile.opentopomap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png'
+            }
+            return 'https://tile.openstreetmap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png'
+          },
+          tileSize: new google.maps.Size(256, 256),
+          name: 'OpenStreetMap',
+          maxZoom: 18
+        })
+        this.mapTypes.set('osm', osmMapType)
+
         this.addListener('idle', () => {
           if (globalMap == null) {
             onMapUpdate(this)
           }
         })
         this.addListener('maptypeid_changed', () => {
-          // Save the map type ID so we can prevent GeoGuessr from resetting it
-          setLocalStorage('cg_MapTypeId', this.getMapTypeId())
+          const mapTypeId = this.getMapTypeId()
+          if (mapTypeId !== 'hybrid') {
+            // Save the map type ID so we can prevent GeoGuessr from resetting it
+            setLocalStorage('cg_MapTypeId', mapTypeId)
+          }
+          reloadMap()
         })
       }
 
@@ -326,16 +396,29 @@ async function hijackMap() {
         // so this is how we can distinguish between theirs and ours
         if (opts.backgroundColor) {
           opts.mapTypeId = getLocalStorage('cg_MapTypeId', opts.mapTypeId)
-          opts.mapTypeControl = true
           opts.mapTypeControlOptions = {
-            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-            position: google.maps.ControlPosition.TOP_RIGHT
+            ...opts.mapTypeControlOptions,
+            mapTypeIds: [...(opts.mapTypeControlOptions?.mapTypeIds || []), 'osm']
           }
         }
         super.setOptions(opts)
       }
     }
   })
+}
+
+function reloadMap() {
+  if (!globalMap) return
+  const mapTypeId = getLocalStorage('cg_MapTypeId', 'roadmap')
+  const satelliteHybrid = getLocalStorage('cg_satelliteHybrid', false)
+
+  if (mapTypeId === 'satellite' && satelliteHybrid) {
+    globalMap.setMapTypeId(google.maps.MapTypeId.HYBRID)
+  } else if (mapTypeId === 'satellite' && !satelliteHybrid) {
+    globalMap.setMapTypeId(google.maps.MapTypeId.SATELLITE)
+  } else {
+    globalMap.setMapTypeId(mapTypeId)
+  }
 }
 
 export const rendererApi = {
@@ -345,5 +428,6 @@ export const rendererApi = {
   clearMarkers,
   showSatelliteMap,
   hideSatelliteMap,
-  centerSatelliteView
+  centerSatelliteView,
+  reloadMap
 }
