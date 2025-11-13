@@ -321,7 +321,12 @@ async function hijackMap() {
 
       checkboxWrapper.style.backgroundColor = 'rgb(37, 40, 42)'
       checkboxWrapper.style.padding = '5px'
-      checkboxWrapper.style.display = 'none'
+      const currentMapTypeId = map.getMapTypeId()
+      if (currentMapTypeId === mapTypeId || (mapTypeId === 'satellite' && currentMapTypeId === 'hybrid')) {
+        checkboxWrapper.style.display = 'block'
+      } else {
+        checkboxWrapper.style.display = 'none'
+      }
       checkboxWrapper.style.color = 'white'
       checkboxWrapper.style.fontSize = '12px'
       checkboxWrapper.style.fontWeight = '500'
@@ -378,8 +383,10 @@ async function hijackMap() {
         })
         this.addListener('maptypeid_changed', () => {
           const mapTypeId = this.getMapTypeId()
-          // Save the map type ID so we can prevent GeoGuessr from resetting it
-          setLocalStorage('cg_MapTypeId', mapTypeId)
+          if (mapTypeId !== 'hybrid') {
+            // Save the map type ID so we can prevent GeoGuessr from resetting it
+            setLocalStorage('cg_MapTypeId', mapTypeId)
+          }
           reloadMap()
         })
       }
@@ -407,9 +414,9 @@ function reloadMap() {
 
   if (mapTypeId === 'satellite' && satelliteHybrid) {
     globalMap.setMapTypeId(google.maps.MapTypeId.HYBRID)
+  } else if (mapTypeId === 'satellite' && !satelliteHybrid) {
+    globalMap.setMapTypeId(google.maps.MapTypeId.SATELLITE)
   } else {
-    // This is a bit of a hack to force a refresh of the custom tiles
-    globalMap.setMapTypeId('roadmap')
     globalMap.setMapTypeId(mapTypeId)
   }
 }
