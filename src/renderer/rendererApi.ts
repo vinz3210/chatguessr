@@ -311,12 +311,24 @@ async function hijackMap() {
       constructor(mapDiv: HTMLElement, opts: google.maps.MapOptions) {
         super(mapDiv, opts)
 
+
+        // https://c.tile.opentopomap.org/2/2/3.png
+        const openTopoMapType = new google.maps.ImageMapType({
+          getTileUrl: function (coord, zoom) {
+            return 'https://c.tile.opentopomap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png'
+          },
+          tileSize: new google.maps.Size(256, 256),
+          name: 'OTM',
+          maxZoom: 18
+        })
+        this.mapTypes.set('opentopomap', openTopoMapType)
+
         const osmMapType = new google.maps.ImageMapType({
           getTileUrl: function (coord, zoom) {
             return 'https://tile.openstreetmap.org/' + zoom + '/' + coord.x + '/' + coord.y + '.png'
           },
           tileSize: new google.maps.Size(256, 256),
-          name: 'OpenStreetMap',
+          name: 'OSM',
           maxZoom: 18
         })
         this.mapTypes.set('osm', osmMapType)
@@ -332,6 +344,7 @@ async function hijackMap() {
         })
       }
 
+
       setOptions(opts: google.maps.MapOptions) {
         // GeoGuessr's `setOptions` calls always include `backgroundColor`
         // so this is how we can distinguish between theirs and ours
@@ -343,7 +356,9 @@ async function hijackMap() {
               google.maps.MapTypeId.ROADMAP,
               google.maps.MapTypeId.TERRAIN,
               google.maps.MapTypeId.SATELLITE,
-              'osm'
+              google.maps.MapTypeId.HYBRID,
+              'osm',
+              'opentopomap'
             ],
             style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
             position: google.maps.ControlPosition.TOP_RIGHT
