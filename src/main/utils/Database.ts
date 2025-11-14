@@ -174,15 +174,36 @@ const migrations: ((db: SQLite.Database) => void)[] = [
     db.prepare(`ALTER TABLE guesses ADD COLUMN last_streak INTEGER DEFAULT NULL`).run()
   },
   function moveFlagColorFieldsToUsersTable(db) {
-    db.prepare(`ALTER TABLE guesses DROP COLUMN color`).run()
-    db.prepare(`ALTER TABLE guesses DROP COLUMN flag`).run()
-    db.prepare(`ALTER TABLE users ADD COLUMN color STRING DEFAULT "#FFF"`).run()
+    // Drop old columns from guesses if they exist, then add color to users.
+    try {
+      const guessCols = db.prepare(`PRAGMA table_info('guesses')`).all() as { name: string }[]
+      if (guessCols.some((c) => c.name === 'color')) {
+        db.prepare(`ALTER TABLE guesses DROP COLUMN color`).run()
+      }
+      if (guessCols.some((c) => c.name === 'flag')) {
+        db.prepare(`ALTER TABLE guesses DROP COLUMN flag`).run()
+      }
+    } catch (err) {
+      // ignore
+    }
+    try {
+      db.prepare(`ALTER TABLE users ADD COLUMN color STRING DEFAULT "#FFF"`).run()
+    } catch (err) {
+      // ignore if column already exists or ALTER not supported
+    }
   },
   function createUsersAvatarField(db) {
     db.prepare(`ALTER TABLE users ADD COLUMN avatar STRING DEFAULT NULL`).run()
   },
   function removeUsersLastLocationField(db) {
-    db.prepare(`ALTER TABLE users DROP COLUMN last_location`).run()
+    try {
+      const cols = db.prepare(`PRAGMA table_info('users')`).all() as { name: string }[]
+      if (cols.some((c) => c.name === 'last_location')) {
+        db.prepare(`ALTER TABLE users DROP COLUMN last_location`).run()
+      }
+    } catch (err) {
+      // ignore
+    }
   },
   function createIsRandomPlonk(db) {
     db.prepare(`ALTER TABLE guesses ADD COLUMN is_random_plonk INTEGER DEFAULT NULL`).run()
@@ -191,7 +212,17 @@ const migrations: ((db: SQLite.Database) => void)[] = [
     db.prepare(`ALTER TABLE rounds ADD COLUMN isInvertedScoring INTEGER DEFAULT NULL`).run()  
   },
     function removeUsersPreviousGuessField(db) {
-      db.prepare(`ALTER TABLE users DROP COLUMN previous_guess`).run()
+        // Some SQLite builds or older DB instances might not have this column anymore.
+        // Guard the DROP with a check to avoid throwing "no such column" errors.
+        try {
+          const cols = db.prepare(`PRAGMA table_info('users')`).all() as { name: string }[]
+          const hasPreviousGuess = cols.some((c) => c.name === 'previous_guess')
+          if (hasPreviousGuess) {
+            db.prepare(`ALTER TABLE users DROP COLUMN previous_guess`).run()
+          }
+        } catch (err) {
+          // Silently ignore any errors here; migration should be best-effort and not break startup.
+        }
   }
 ]
 
