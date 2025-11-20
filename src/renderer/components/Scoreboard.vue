@@ -153,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { shallowRef, shallowReactive, reactive, onMounted, toRef, watch, computed, nextTick } from 'vue'
+import { shallowRef, shallowReactive, reactive, onMounted, onBeforeUnmount, toRef, watch, computed, nextTick } from 'vue'
 import { useIntervalFn } from '@vueuse/core'
 import formatDuration from 'format-duration'
 import { getLocalStorage, setLocalStorage } from '@/useLocalStorage'
@@ -181,12 +181,17 @@ const defaultPosition = { x: 20, y: 50, w: 340, h: 390 }
 const position = shallowReactive(defaultPosition)
 
 onMounted(async () => {
+  console.log("Scoreboard: mounted")
   await nextTick(); // Waits until the component is actually rendered, preventing potential null values
 
   Object.assign(
     position,
     getLocalStorage('cg_scoreboard__position', defaultPosition)
   )
+})
+
+onBeforeUnmount(() => {
+  console.log("Scoreboard: beforeUnmount")
 })
 
 const settings = reactive(

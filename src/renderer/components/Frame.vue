@@ -1,16 +1,17 @@
 <template>
   <div :class="['cg-frame-container', { hidden: gameState === 'none' }]">
     <transition name="scoreboard_modal">
-      <Scoreboard
-        v-show="widgetVisibility.scoreboardAndGgInterfaceVisible"
-        ref="scoreboard"
-        :game-state
-        :is-multi-guess
-        :is-b-r-mode
-        :mode-help
-        :on-round-result-row-click
-        :on-game-result-row-click
-      />
+      <div v-show="widgetVisibility.scoreboardAndGgInterfaceVisible" style="position: absolute; z-index: 24;">
+        <Scoreboard
+          ref="scoreboard"
+          :game-state
+          :is-multi-guess
+          :is-b-r-mode
+          :mode-help
+          :on-round-result-row-click
+          :on-game-result-row-click
+        />
+      </div>
     </transition>
     <div id="debugElement" style="background: hotpink; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 1.5rem; display:none;">
       <b>Debug stuff!</b>
@@ -253,6 +254,8 @@ onBeforeUnmount(
 
     isMultiGuess.value = _isMultiGuess
     isBRMode.value = _isBRMode
+    console.log("Frame: onGameStarted", { isMultiGuess: _isMultiGuess, isBRMode: _isBRMode })
+    console.log("Frame: scoreboard ref", scoreboard.value)
     console.log("isBRMode", isBRMode.value)
     
     modeHelp.value = _modeHelp
