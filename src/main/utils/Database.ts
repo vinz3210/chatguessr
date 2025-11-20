@@ -174,55 +174,35 @@ const migrations: ((db: SQLite.Database) => void)[] = [
     db.prepare(`ALTER TABLE guesses ADD COLUMN last_streak INTEGER DEFAULT NULL`).run()
   },
   function moveFlagColorFieldsToUsersTable(db) {
-    // Drop old columns from guesses if they exist, then add color to users.
-    try {
-      const guessCols = db.prepare(`PRAGMA table_info('guesses')`).all() as { name: string }[]
-      if (guessCols.some((c) => c.name === 'color')) {
-        db.prepare(`ALTER TABLE guesses DROP COLUMN color`).run()
-      }
-      if (guessCols.some((c) => c.name === 'flag')) {
-        db.prepare(`ALTER TABLE guesses DROP COLUMN flag`).run()
-      }
-    } catch (err) {
-      // ignore
-    }
-    try {
-      db.prepare(`ALTER TABLE users ADD COLUMN color STRING DEFAULT "#FFF"`).run()
-    } catch (err) {
-      // ignore if column already exists or ALTER not supported
-    }
+    db.prepare(`ALTER TABLE guesses DROP COLUMN color`).run()
+    db.prepare(`ALTER TABLE guesses DROP COLUMN flag`).run()
+    db.prepare(`ALTER TABLE users ADD COLUMN color STRING DEFAULT "#FFF"`).run()
   },
   function createUsersAvatarField(db) {
     db.prepare(`ALTER TABLE users ADD COLUMN avatar STRING DEFAULT NULL`).run()
   },
   function removeUsersLastLocationField(db) {
-    try {
-      const cols = db.prepare(`PRAGMA table_info('users')`).all() as { name: string }[]
-      if (cols.some((c) => c.name === 'last_location')) {
-        db.prepare(`ALTER TABLE users DROP COLUMN last_location`).run()
-      }
-    } catch (err) {
-      // ignore
-    }
+    db.prepare(`ALTER TABLE users DROP COLUMN last_location`).run()
   },
   function createIsRandomPlonk(db) {
     db.prepare(`ALTER TABLE guesses ADD COLUMN is_random_plonk INTEGER DEFAULT NULL`).run()
   },
   function createRoundMode(db) {
-    db.prepare(`ALTER TABLE rounds ADD COLUMN isInvertedScoring INTEGER DEFAULT NULL`).run()  
+    db.prepare(`ALTER TABLE rounds ADD COLUMN isInvertedScoring INTEGER DEFAULT NULL`).run()
   },
-    function removeUsersPreviousGuessField(db) {
-        // Some SQLite builds or older DB instances might not have this column anymore.
-        // Guard the DROP with a check to avoid throwing "no such column" errors.
-        try {
-          const cols = db.prepare(`PRAGMA table_info('users')`).all() as { name: string }[]
-          const hasPreviousGuess = cols.some((c) => c.name === 'previous_guess')
-          if (hasPreviousGuess) {
-            db.prepare(`ALTER TABLE users DROP COLUMN previous_guess`).run()
-          }
-        } catch (err) {
-          // Silently ignore any errors here; migration should be best-effort and not break startup.
-        }
+  function removeUsersPreviousGuessField(db) {
+    const tableInfo = db.pragma('table_info(users)') as { name: string }[]
+    const hasPreviousGuess = tableInfo.some((col) => col.name === 'previous_guess')
+    if (hasPreviousGuess) {
+      db.prepare(`ALTER TABLE users DROP COLUMN previous_guess`).run()
+    }
+
+    // Fix for users coming from the main branch who skipped the createRoundMode migration
+    const roundsTableInfo = db.pragma('table_info(rounds)') as { name: string }[]
+    const hasIsInvertedScoring = roundsTableInfo.some((col) => col.name === 'isInvertedScoring')
+    if (!hasIsInvertedScoring) {
+      db.prepare(`ALTER TABLE rounds ADD COLUMN isInvertedScoring INTEGER DEFAULT NULL`).run()
+    }
   }
 ]
 
@@ -230,7 +210,7 @@ const migrations: ((db: SQLite.Database) => void)[] = [
 // for users that move between versions.
 // NEVER modify existing migrations, ONLY add new ones.
 const customMigrations: ((db: SQLite.Database) => void)[] = [
-  function createGameWinner(db){
+  function createGameWinner(db) {
     db.prepare(`ALTER TABLE games ADD COLUMN game_winner TEXT DEFAULT NULL`).run()
   }
   ,
@@ -275,15 +255,13 @@ class db {
     }
   }
 
-  #createMigrationTableIfNotExist()
-  {
+  #createMigrationTableIfNotExist() {
     const tableExists = this.#db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='custom_cg_info';`).get()
-    if (!tableExists)
-    {
+    if (!tableExists) {
       this.#db.prepare(
         `CREATE TABLE "custom_cg_info" (
-          "index"	INTEGER UNIQUE,
-          "version"	INTEGER NOT NULL,
+          "index"   INTEGER UNIQUE,
+          "version" INTEGER NOT NULL,
           PRIMARY KEY("index")
         );
       `).run()
@@ -291,14 +269,14 @@ class db {
       this.#db.prepare(
         `INSERT INTO custom_cg_info("index", "version")
         VALUES (:index, :version);
-      `).run({index: 0, version: 0})
+      `).run({ index: 0, version: 0 })
     }
   }
 
   #customMigrateUp() {
     const row = this.#db
-    .prepare(`SELECT version from custom_cg_info DESC LIMIT 1`)
-    .get() as {version: number} | undefined
+      .prepare(`SELECT version from custom_cg_info DESC LIMIT 1`)
+      .get() as { version: number } | undefined
     if (row && typeof row.version === 'number' && row.version < customMigrations.length) {
       const up = this.#db.transaction(() => {
         customMigrations[row.version](this.#db)
@@ -415,9 +393,9 @@ class db {
     })
   }
 
-  updatePano(panoId: string, roundId: string| undefined) {
+  updatePano(panoId: string, roundId: string | undefined) {
     // get location from roundId
-    if(!roundId) {
+    if (!roundId) {
       return
     }
     const stmt = this.#db.prepare(`SELECT location from rounds WHERE id = ?`)
@@ -499,17 +477,17 @@ class db {
 
     const row = stmt.get(roundId, userId) as
       | {
-          id: string
-          avatar: string | null
-          color: string
-          flag: string | null
-          location: string
-          streakCode: string | null
-          streak: number
-          lastStreak: number | null
-          distance: number
-          score: number
-        }
+        id: string
+        avatar: string | null
+        color: string
+        flag: string | null
+        location: string
+        streakCode: string | null
+        streak: number
+        lastStreak: number | null
+        distance: number
+        score: number
+      }
       | undefined
 
     if (!row) {
@@ -574,10 +552,10 @@ class db {
 
     return row
       ? {
-          id: row.id,
-          count: row.count,
-          lastLocation: JSON.parse(row.location)
-        }
+        id: row.id,
+        count: row.count,
+        lastLocation: JSON.parse(row.location)
+      }
       : undefined
   }
 
@@ -638,15 +616,15 @@ class db {
    */
   getRoundParticipants(roundId: string) {
     const stmt = this.#db.prepare(`
-			SELECT
-				users.username,
-				users.avatar,
-				users.color,
-				users.flag
-			FROM guesses, users
-			WHERE round_id = ? AND users.id = guesses.user_id
-			ORDER BY created_at ASC
-		`)
+            SELECT
+                users.username,
+                users.avatar,
+                users.color,
+                users.flag
+            FROM guesses, users
+            WHERE round_id = ? AND users.id = guesses.user_id
+            ORDER BY created_at ASC
+        `)
 
     const records = stmt.all(roundId) as Player[]
 
@@ -663,7 +641,7 @@ class db {
   //   console.log("updateGuessesToBR", roundId, brCounter, subtractedPoints)
   //   // example values: 81deadf7-111e-4d8c-8c65-5a99df63be5a { '269244141': 1, '1128490111': 1, '1226669482': 1 } 500
   //   // for every user in brCounter, update their score by the value * subtractedPoints
-    
+
   //   const stmt = this.#db.prepare(`
   //     UPDATE guesses
   //     SET score = score - :subtractedUserPoints
@@ -754,7 +732,7 @@ ORDER BY
     guesses.score DESC,
     time_to_5k ASC,
     guesses.distance ASC;
-		`)
+        `)
 
     const records = stmt.all(roundId, roundId) as {
       id: string
@@ -847,42 +825,42 @@ ORDER BY
     // performance is not too bad.
 
     const stmt = this.#db.prepare(`
-			SELECT
+            SELECT
         users.id,
-				users.username,
-				users.avatar,
-				users.color,
-				users.flag,
-				'[' || GROUP_CONCAT(COALESCE(guesses.location, 'null')) || ']' AS guesses,
-				'[' || GROUP_CONCAT(COALESCE(guesses.score, 'null')) || ']' AS scores,
-				'[' || GROUP_CONCAT(COALESCE(guesses.distance, 'null')) || ']' AS distances,
-				SUM(guesses.score) AS total_score,
-				SUM(guesses.distance) AS total_distance,
-				(
-					SELECT streak
-					FROM guesses ig, rounds ir
-					WHERE ir.game_id = rounds.game_id
-						AND ig.round_id = ir.id
-						AND ig.user_id = users.id
-					ORDER BY ig.created_at DESC
-					LIMIT 1
-				) AS streak,
+                users.username,
+                users.avatar,
+                users.color,
+                users.flag,
+                '[' || GROUP_CONCAT(COALESCE(guesses.location, 'null')) || ']' AS guesses,
+                '[' || GROUP_CONCAT(COALESCE(guesses.score, 'null')) || ']' AS scores,
+                '[' || GROUP_CONCAT(COALESCE(guesses.distance, 'null')) || ']' AS distances,
+                SUM(guesses.score) AS total_score,
+                SUM(guesses.distance) AS total_distance,
+                (
+                    SELECT streak
+                    FROM guesses ig, rounds ir
+                    WHERE ir.game_id = rounds.game_id
+                        AND ig.round_id = ir.id
+                        AND ig.user_id = users.id
+                    ORDER BY ig.created_at DESC
+                    LIMIT 1
+                ) AS streak,
     CASE
         WHEN SUM(guesses.is_random_plonk) = COUNT(guesses.id) THEN 1
         ELSE 0
     END AS is_random_plonk_matches
-			FROM rounds
-			JOIN users ON users.id IN (
-				SELECT DISTINCT g.user_id
-				FROM rounds r
-				JOIN guesses g ON g.round_id = r.id
-				WHERE r.game_id = ?
-			)
-			LEFT JOIN guesses ON guesses.round_id = rounds.id AND users.id = guesses.user_id
-			WHERE rounds.game_id = ?
-			GROUP BY users.id
-			ORDER BY total_score DESC, total_distance ASC
-		`)
+            FROM rounds
+            JOIN users ON users.id IN (
+                SELECT DISTINCT g.user_id
+                FROM rounds r
+                JOIN guesses g ON g.round_id = r.id
+                WHERE r.game_id = ?
+            )
+            LEFT JOIN guesses ON guesses.round_id = rounds.id AND users.id = guesses.user_id
+            WHERE rounds.game_id = ?
+            GROUP BY users.id
+            ORDER BY total_score DESC, total_distance ASC
+        `)
 
     const records = stmt.all(gameId, gameId) as {
       id: string
@@ -954,7 +932,7 @@ ORDER BY
 
 
   getOrCreateUser(id: string, username: string, avatar: string | undefined, color = '#FFF') {
-    if(avatar == undefined) {
+    if (avatar == undefined) {
       return this.getOrCreateUserWithoutAvatar(id, username, color)
     }
     return this.getOrCreateUserWithAvatar(id, username, avatar, color)
@@ -1019,16 +997,15 @@ ORDER BY
   }
   didUserWinLastRound(userId: string, roundId: string, isInvertedScoring: boolean, surviveIf5k: boolean): boolean {
     var query = `select user_id from guesses where round_id = (select id from rounds where game_id = (select game_id from rounds where id = :id)
-	order by created_at desc
+    order by created_at desc
     LIMIT 1 OFFSET 1) `
-    if (surviveIf5k)
-    {
+    if (surviveIf5k) {
       query += `and score < 5000 `
     }
-    const order = isInvertedScoring ? 'desc': 'asc'
+    const order = isInvertedScoring ? 'desc' : 'asc'
     query += `order by distance ${order}, score desc limit 1;`
     var stmt = this.#db.prepare(query)
-    const record = stmt.get({id: roundId }) as { user_id: string } | undefined
+    const record = stmt.get({ id: roundId }) as { user_id: string } | undefined
     return record ? record.user_id === userId : false
   }
 
@@ -1052,32 +1029,32 @@ ORDER BY
 
     const record = stmt.get({ id: userId, since: sinceTimestamp }) as
       | {
-          username: string
-          flag: string
-          current_streak: number
-          best_streak: number
-          total_guesses: number
-          correct_guesses: number
-          perfects: number
-          average: number
-          victories: number
-          bestRandomPlonk: number
-        }
+        username: string
+        flag: string
+        current_streak: number
+        best_streak: number
+        total_guesses: number
+        correct_guesses: number
+        perfects: number
+        average: number
+        victories: number
+        bestRandomPlonk: number
+      }
       | undefined
 
     return record
       ? {
-          username: record.username,
-          flag: record.flag,
-          streak: record.current_streak,
-          bestStreak: record.best_streak,
-          nbGuesses: record.total_guesses,
-          correctGuesses: record.correct_guesses,
-          meanScore: record.average,
-          perfects: record.perfects,
-          victories: record.victories,
-          bestRandomPlonk: record.bestRandomPlonk
-        }
+        username: record.username,
+        flag: record.flag,
+        streak: record.current_streak,
+        bestStreak: record.best_streak,
+        nbGuesses: record.total_guesses,
+        correctGuesses: record.correct_guesses,
+        meanScore: record.average,
+        perfects: record.perfects,
+        victories: record.victories,
+        bestRandomPlonk: record.bestRandomPlonk
+      }
       : undefined
   }
 
@@ -1103,7 +1080,7 @@ ORDER BY
     ORDER BY streak DESC
     LIMIT 100
   `)
-  const victoriesQuery = this.#db.prepare(`
+    const victoriesQuery = this.#db.prepare(`
     SELECT CASE
         WHEN games.game_winner IS NOT NULL THEN games.game_winner
         ELSE game_winners.user_id
@@ -1121,7 +1098,7 @@ ORDER BY
     LIMIT 100
     `);
 
-  const perfectQuery = this.#db.prepare(`
+    const perfectQuery = this.#db.prepare(`
     SELECT users.id, users.username, users.avatar, users.color, users.flag, COUNT(guesses.id) AS perfects
     FROM users
     LEFT JOIN guesses ON guesses.user_id = users.id
@@ -1134,7 +1111,7 @@ ORDER BY
     ORDER BY perfects DESC
     LIMIT 100
   `)
-  const randomQuery = this.#db.prepare(`
+    const randomQuery = this.#db.prepare(`
   SELECT users.id, users.username, users.avatar, users.color, users.flag, guesses.score AS bestRandomPlonk, guesses.distance
   FROM users
   LEFT JOIN guesses ON guesses.user_id = users.id
@@ -1163,12 +1140,12 @@ ORDER BY
     const mostVictories = victoriesQuery.get({ since: sinceTime }) as
       | { id: string; username: string; victories: number }
       | undefined
-      const mostPerfects = perfectQuery.get({ since: sinceTime }) as
-        | { id: string; username: string; perfects: number }
-        | undefined
+    const mostPerfects = perfectQuery.get({ since: sinceTime }) as
+      | { id: string; username: string; perfects: number }
+      | undefined
 
-      const bestRandom = randomQuery.get({ since: sinceTime }) as
-      | { id: string; username: string; bestRandomPlonk: number; distance: number}
+    const bestRandom = randomQuery.get({ since: sinceTime }) as
+      | { id: string; username: string; bestRandomPlonk: number; distance: number }
       | undefined
 
     return {
@@ -1264,7 +1241,7 @@ ORDER BY
     if (!this.#db.memory) {
       try {
         await this.#db.backup(`${this.#db.name}.bak`)
-      } catch {}
+      } catch { }
     }
 
     // For now i'm commenting the transaction, with it there's a forein_key constraint error when deleting ROUNDS (even with foreign_keys = OFF),
@@ -1297,7 +1274,7 @@ ORDER BY
   }
 
   getUserLastLoc(userId: string, roundId: string | undefined) {
-    if( roundId === undefined) {
+    if (roundId === undefined) {
       roundId = "undefined"
     }
     // select the location and country for the user's last 5 guesses if the guess.round_id is not the current round
@@ -1412,5 +1389,5 @@ ORDER BY
 export const database = (dbPath: string) => new db(dbPath)
 
 declare global {
-  interface Database extends db {}
+  interface Database extends db { }
 }
