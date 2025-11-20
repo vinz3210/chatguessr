@@ -20,6 +20,7 @@ async function drawRoundResults(
   roundResults: RoundResult[],
   limit: number = 100
 ) {
+  await mapReady
   const { AdvancedMarkerElement } = await loadMarkerLibrary()
 
   const map = globalMap
@@ -44,7 +45,7 @@ async function drawRoundResults(
         <span class="username" style="color:${result.player.color}">${result.player.username}</span><br>
         ${result.score}<br>
         ${parseDistance(result.distance)}<br/>
-        ${result.streakCode ? `<span class="flag-icon" style="background-image: url(flag:${result.streakCode})"></span>` : ''} ${result.streakCode ? result.streakCode:""}
+        ${result.streakCode ? `<span class="flag-icon" style="background-image: url(flag:${result.streakCode})"></span>` : ''} ${result.streakCode ? result.streakCode : ""}
       `)
       infoWindow.open(map, guessMarker)
     })
@@ -68,6 +69,7 @@ async function drawRoundResults(
 }
 
 async function drawPlayerResults(locations: Location_[], result: GameResultDisplay) {
+  await mapReady
   const { AdvancedMarkerElement } = await loadMarkerLibrary()
 
   const map = globalMap
@@ -124,9 +126,8 @@ function createInfoWindow() {
     pixelOffset: new google.maps.Size(0, 10)
   })
 }
- 
+
 function createCustomGuessMarker(avatar: string | null, index?: number) {
-  console.log("creating custom guess marker with avatar:", avatar, "and index:", index);
   const markerEl = document.createElement('div')
   markerEl.className = 'custom-guess-marker'
 
@@ -293,8 +294,7 @@ async function hijackMap() {
 
   await new Promise<void>((resolve, reject) => {
     const google = window.google
-    const isGamePage = () =>
-      location.pathname.startsWith('/results/') || location.pathname.startsWith('/game/')
+    const isGamePage = () => /^\/([a-zA-Z-]{2,5}\/)?(results|game)\//.test(location.pathname)
 
     async function onMapUpdate(map: google.maps.Map) {
       try {
@@ -309,6 +309,7 @@ async function hijackMap() {
 
     google.maps.Map = class extends google.maps.Map {
       constructor(mapDiv: HTMLElement, opts: google.maps.MapOptions) {
+        opts.mapId = opts.mapId || 'DEMO_MAP_ID'
         super(mapDiv, opts)
 
 
