@@ -2,6 +2,8 @@ import { getLocalStorage, setLocalStorage } from './useLocalStorage'
 
 let globalMap: google.maps.Map | undefined = undefined
 const mapReady = hijackMap()
+removeGameReactions()
+setupMapStyleShortcuts()
 
 let guessMarkers: google.maps.marker.AdvancedMarkerElement[] = []
 let polylines: google.maps.Polyline[] = []
@@ -10,6 +12,61 @@ let satelliteLayer: google.maps.Map | undefined = undefined
 let satelliteMarker: google.maps.marker.AdvancedMarkerElement | undefined = undefined
 const satelliteCanvas = document.createElement('div')
 satelliteCanvas.id = 'satelliteCanvas'
+
+function setupMapStyleShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    // Don't trigger if user is typing in an input
+    if (document.activeElement instanceof HTMLInputElement ||
+      document.activeElement instanceof HTMLTextAreaElement ||
+      (document.activeElement as HTMLElement)?.isContentEditable) {
+      return
+    }
+
+    if (!globalMap) return
+
+    const keyMap: Record<string, string> = {
+      '1': google.maps.MapTypeId.ROADMAP,
+      '2': google.maps.MapTypeId.TERRAIN,
+      '3': google.maps.MapTypeId.SATELLITE,
+      '4': google.maps.MapTypeId.HYBRID,
+      '5': 'osm',
+      '6': 'opentopomap'
+    }
+
+    const mapTypeId = keyMap[e.key]
+    if (mapTypeId) {
+      globalMap.setMapTypeId(mapTypeId)
+    }
+  })
+}
+
+function removeGameReactions() {
+  const selector = '[class^="game-reactions_root"]'
+  const remove = () => {
+    document.querySelectorAll(selector).forEach(el => el.remove())
+  }
+
+  // Initial removal
+  remove()
+
+  // Watch for changes
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node instanceof HTMLElement) {
+          if (node.matches(selector) || node.querySelector(selector)) {
+            remove()
+          }
+        }
+      }
+    }
+  })
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  })
+}
 
 async function loadMarkerLibrary() {
   return (await google.maps.importLibrary('marker')) as unknown as google.maps.MarkerLibrary
