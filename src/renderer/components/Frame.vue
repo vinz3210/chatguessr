@@ -374,73 +374,7 @@ return 0
 
 
 
-    function initialize() {
-  let fenway = { lat: 48.196102579488475, lng: 16.21028423309326};
-  const mapElement = document.getElementById("map") as HTMLElement;
-  const map = new google.maps.Map(mapElement, {
-    center: fenway,
-    zoom: 14
-  });
-  const panoElement = document.getElementById("pano") as HTMLElement;
 
-
-
-
-
-
-const request = {
-  location: fenway,
-  preference: google.maps.StreetViewPreference.NEAREST, // Set the preference
-  radius: 5000 // Search within a 50-meter radius
-};
-
-const streetViewService = new google.maps.StreetViewService();
-let closestPanoId;
-let lat;
-let lng;
-streetViewService.getPanorama(request, (panoramaData, status) => {
-  console.log("panoramaData", panoramaData)
-  console.log("status", status)
-  if (status === google.maps.StreetViewStatus.OK) {
-    console.log("panoramaData", panoramaData)
-    if(!panoramaData) return
-    if(!panoramaData.location) return
-    closestPanoId = panoramaData.location.pano;
-    if(!panoramaData.location.latLng) return
-    lat = panoramaData.location.latLng.lat();
-    lng = panoramaData.location.latLng.lng();
-    console.log('Closest Street View panorama ID:', closestPanoId);
-    fenway = { lat: lat, lng: lng};
-console.log("fenway", fenway)
-
-
-const panorama = new google.maps.StreetViewPanorama(
-    panoElement,
-    {
-      position: fenway,
-      pov: {
-        heading: 34,
-        pitch: 10
-      },
-      
-    }
-  );
-  map.setStreetView(panorama);
-
-  } else {
-    console.error('Street View data is not available for this location.');
-  }
-});
-
-
-
-
-
-}
-
-window.initialize = initialize
-window.initialize()
-console.log("after init")
 
     })
 )
@@ -814,10 +748,66 @@ function injecterCallback(overrider)
  
 
   injecter(() => {
+    const panoInstances: google.maps.StreetViewPanorama[] = []
+
+    function forceContextLoss(div: HTMLElement) {
+      try {
+        const canvas = div.querySelector('canvas')
+        if (!canvas) return
+        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2')
+        if (gl) {
+          const ext = gl.getExtension('WEBGL_lose_context')
+          if (ext) {
+            console.log('[ChatGuessr] Forcing WebGL context loss for old panorama instance')
+            ext.loseContext()
+          }
+        }
+      } catch (e) {
+        console.error('[ChatGuessr] Error forcing context loss:', e)
+      }
+    }
+
     google.maps.StreetViewPanorama = class extends google.maps.StreetViewPanorama {
       constructor(...args: any[]) {
+          // Cleanup old instances
+          while (panoInstances.length > 0) {
+            const oldPano = panoInstances.shift()
+            if (oldPano) {
+              // @ts-ignore
+              const div = oldPano.getNode ? oldPano.getNode() : null
+              // If getNode is not available (it should be on internal instances but maybe not on the wrapper), 
+              // we might need another way. But usually these wrappers pass the div to super.
+              // Actually, the first arg is usually the div.
+              if (args[0] instanceof HTMLElement) {
+                 // This is the new one. We need the old one's div.
+                 // We can't easily get the div from the instance if it's not exposed.
+                 // But wait, we can store the div when we create it.
+              }
+            }
+          }
+          
           super(...args as [any, ...any[]]);
           MWStreetViewInstance = this;
+          
+          // Store instance. 
+          // Note: We can't easily get the div back from the instance in standard API.
+          // But we can attach it to the instance or store it in a parallel array.
+          // Let's store the div directly if possible.
+          if (args[0] instanceof HTMLElement) {
+             // @ts-ignore
+             this.__div = args[0]
+          }
+          panoInstances.push(this)
+          
+          // Cleanup logic using stored div
+          if (panoInstances.length > 1) {
+             const oldPano = panoInstances.shift()
+             // @ts-ignore
+             if (oldPano && oldPano.__div) {
+                // @ts-ignore
+                forceContextLoss(oldPano.__div)
+             }
+          }
       }
     }
   });

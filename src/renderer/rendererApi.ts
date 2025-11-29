@@ -307,10 +307,39 @@ async function hijackMap() {
       }
     }
 
+    const mapInstances: google.maps.Map[] = []
+
+    function forceContextLoss(div: HTMLElement) {
+      try {
+        const canvas = div.querySelector('canvas')
+        if (!canvas) return
+        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2')
+        if (gl) {
+          const ext = gl.getExtension('WEBGL_lose_context')
+          if (ext) {
+            console.log('[ChatGuessr] Forcing WebGL context loss for old map instance')
+            ext.loseContext()
+          }
+        }
+      } catch (e) {
+        console.error('[ChatGuessr] Error forcing context loss:', e)
+      }
+    }
+
     google.maps.Map = class extends google.maps.Map {
       constructor(mapDiv: HTMLElement, opts: google.maps.MapOptions) {
+        // Cleanup old instances
+        while (mapInstances.length > 0) {
+          const oldMap = mapInstances.shift()
+          if (oldMap) {
+            const div = oldMap.getDiv()
+            if (div) forceContextLoss(div)
+          }
+        }
+
         opts.mapId = opts.mapId || 'DEMO_MAP_ID'
         super(mapDiv, opts)
+        mapInstances.push(this)
 
 
         // https://c.tile.opentopomap.org/2/2/3.png
