@@ -2,7 +2,6 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
 
 declare global {
   interface Window {
-    chatguessrApi: any
     toggleGuessGuessMode: (el: HTMLInputElement) => void
   }
 }
