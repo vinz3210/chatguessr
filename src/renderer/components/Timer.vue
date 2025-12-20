@@ -50,15 +50,22 @@
           <input v-model="settings.autoCloseGuesses" type="checkbox" />
         </label>
         <hr />
+        
+        <label class="form__group">
+          Break time ({{ tempTimeLimit }} sec) :
+          <div class="flex gap-05">
+            <input v-model.number="tempTimeLimit" type="number" min="1" step="1" />
+            <button class="btn-small" @click="resetWithTempTime()">Set</button>
+          </div>
+        </label>
+        <hr />
 
         <label class="form__group"
           >Time ({{ settings.timeLimit }} sec) :
           <input
             v-model.number="settings.timeLimit"
-            type="range"
+            type="number"
             min="5"
-            max="600"
-            step="5"
             @input="reset()"
           />
         </label>
@@ -217,6 +224,9 @@ const audioPath = shallowRef<string | false>(false)
 const availableFonts = shallowRef()
 const settingsVisibility = shallowRef(false)
 const iconsVisibility = shallowRef(false)
+
+const tempTimeLimit = shallowRef(getLocalStorage('cg_timer__break_time', 60))
+watch(tempTimeLimit, (val) => setLocalStorage('cg_timer__break_time', val))
 
 let targetTimestamp = 0
 let pausedDifference = 0
@@ -412,6 +422,17 @@ const reset = () => {
   updateDisplay()
 }
 
+const resetWithTempTime = () => {
+  pause()
+
+  isStarted.value = false
+  isPaused.value = false // Shows start button
+  isTimeToPlonk.value = false
+
+  pausedDifference = tempTimeLimit.value * 1000
+  updateDisplay(pausedDifference)
+}
+
 const updateDisplay = (targetTime?: number) => {
   const nowTimestamp = Date.now()
   if (targetTime !== undefined) {
@@ -517,5 +538,18 @@ svg:active {
     display: none;
     opacity: 0;
   }
+}
+
+.btn-small {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 0.8em;
+}
+.btn-small:hover {
+  background-color: var(--primary-hover);
 }
 </style>
