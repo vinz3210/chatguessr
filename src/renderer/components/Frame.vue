@@ -798,7 +798,7 @@ function injecterCallback(overrider)
              this.__div = args[0]
           }
           panoInstances.push(this)
-          
+          console.log("panoInstances", panoInstances)
           // Cleanup logic using stored div
           if (panoInstances.length > 1) {
              const oldPano = panoInstances.shift()
