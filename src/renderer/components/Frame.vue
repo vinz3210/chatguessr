@@ -752,15 +752,37 @@ function injecterCallback(overrider)
 
     function forceContextLoss(div: HTMLElement) {
       try {
-        const canvas = div.querySelector('canvas')
-        if (!canvas) return
+        const findCanvas = (root: ParentNode): HTMLCanvasElement | null => {
+            const canvas = root.querySelector('canvas');
+            if (canvas) return canvas;
+            
+            const all = root.querySelectorAll('*');
+            for(const el of Array.from(all)) {
+                if (el.shadowRoot) {
+                    const found = findCanvas(el.shadowRoot);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        const canvas = findCanvas(div)
+        if (!canvas) {
+           console.warn('[ChatGuessr] forceContextLoss: No canvas found in pano div!', div);
+           return;
+        }
+
         const gl = canvas.getContext('webgl') || canvas.getContext('webgl2')
         if (gl) {
           const ext = gl.getExtension('WEBGL_lose_context')
           if (ext) {
-            console.log('[ChatGuessr] Forcing WebGL context loss for old panorama instance')
+            console.log('[ChatGuessr] Forcing WebGL context loss for old panorama instance', canvas)
             ext.loseContext()
+          } else {
+             console.warn('[ChatGuessr] WEBGL_lose_context extension not supported on pano canvas');
           }
+        } else {
+           console.warn('[ChatGuessr] Canvas found but no WebGL context returned on pano canvas');
         }
       } catch (e) {
         console.error('[ChatGuessr] Error forcing context loss:', e)
@@ -770,7 +792,7 @@ function injecterCallback(overrider)
     google.maps.StreetViewPanorama = class extends google.maps.StreetViewPanorama {
       constructor(...args: any[]) {
           // Cleanup old instances
-          while (panoInstances.length > 0) {
+          while (panoInstances.length >= 3) {
             const oldPano = panoInstances.shift()
             if (oldPano) {
               // @ts-ignore
@@ -783,6 +805,11 @@ function injecterCallback(overrider)
                  // We can't easily get the div from the instance if it's not exposed.
                  // But wait, we can store the div when we create it.
               }
+            }
+            // @ts-ignore
+            if (oldPano && oldPano.__div) {
+               // @ts-ignore
+               forceContextLoss(oldPano.__div)
             }
           }
           
@@ -798,16 +825,6 @@ function injecterCallback(overrider)
              this.__div = args[0]
           }
           panoInstances.push(this)
-          console.log("panoInstances", panoInstances)
-          // Cleanup logic using stored div
-          if (panoInstances.length > 1) {
-             const oldPano = panoInstances.shift()
-             // @ts-ignore
-             if (oldPano && oldPano.__div) {
-                // @ts-ignore
-                forceContextLoss(oldPano.__div)
-             }
-          }
       }
     }
   });

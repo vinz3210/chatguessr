@@ -368,15 +368,37 @@ async function hijackMap() {
 
     function forceContextLoss(div: HTMLElement) {
       try {
-        const canvas = div.querySelector('canvas')
-        if (!canvas) return
+        const findCanvas = (root: ParentNode): HTMLCanvasElement | null => {
+          const canvas = root.querySelector('canvas');
+          if (canvas) return canvas;
+
+          const all = root.querySelectorAll('*');
+          for (const el of Array.from(all)) {
+            if (el.shadowRoot) {
+              const found = findCanvas(el.shadowRoot);
+              if (found) return found;
+            }
+          }
+          return null;
+        }
+
+        const canvas = findCanvas(div)
+        if (!canvas) {
+          console.warn('[ChatGuessr] forceContextLoss: No canvas found in map div!', div);
+          return;
+        }
+
         const gl = canvas.getContext('webgl') || canvas.getContext('webgl2')
         if (gl) {
           const ext = gl.getExtension('WEBGL_lose_context')
           if (ext) {
-            console.log('[ChatGuessr] Forcing WebGL context loss for old map instance')
+            console.log('[ChatGuessr] Forcing WebGL context loss for old map instance', canvas)
             ext.loseContext()
+          } else {
+            console.warn('[ChatGuessr] WEBGL_lose_context extension not supported on map canvas');
           }
+        } else {
+          console.warn('[ChatGuessr] Canvas found but no WebGL context returned on map canvas');
         }
       } catch (e) {
         console.error('[ChatGuessr] Error forcing context loss:', e)
@@ -386,7 +408,7 @@ async function hijackMap() {
     google.maps.Map = class extends google.maps.Map {
       constructor(mapDiv: HTMLElement, opts: google.maps.MapOptions) {
         // Cleanup old instances
-        while (mapInstances.length > 0) {
+        while (mapInstances.length >= 3) {
           const oldMap = mapInstances.shift()
           if (oldMap) {
             const div = oldMap.getDiv()
