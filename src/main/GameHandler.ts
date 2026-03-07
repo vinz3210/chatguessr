@@ -61,6 +61,8 @@ export default class GameHandler {
 
   TMPZ: boolean
 
+  #refreshingSeed: boolean = false
+
   #hideAndSeekQueue: { user: string; location: HideAndSeekLocation }[] = []
 
   constructor(
@@ -663,11 +665,17 @@ export default class GameHandler {
         this.#pay2WinUsers = []
       }
 
+      if (this.#refreshingSeed) return
+      this.#refreshingSeed = true
       this.#game.refreshSeed(callbackFunctions, this.#battleRoyaleCounter, settings.isHideAndSeekMode).then((roundResults) => {
         if (settings.debugMode) console.log(`[DEBUG] refreshSeed completed. New roundResults:`, roundResults)
         if (roundResults && roundResults.location) {
           this.#showRoundResults(roundResults.location, roundResults.roundResults)
         }
+      }).catch((err) => {
+        console.error(`[CHATGUESSR] Failed to refresh seed:`, err)
+      }).finally(() => {
+        this.#refreshingSeed = false
       })
       callbackFunctions = {
         disappointed: {

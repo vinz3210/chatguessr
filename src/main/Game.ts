@@ -194,7 +194,14 @@ export default class Game {
 
   // @ts-ignore
   async refreshSeed(callbackFunctions: redeemCallbackFunctions = {}, brCounter: { [key: string]: number }, isHideAndSeekMode: boolean = false) {
-    const newSeed = await this.#getSeed()
+    let newSeed: Seed | undefined
+    try {
+      newSeed = await this.#getSeed()
+    } catch (err) {
+      console.warn(`[CHATGUESSR] refreshSeed: could not fetch seed.`, err)
+      return false
+    }
+
     let omitBroadcasterGuess = false
 
     // If a guess has been committed, process streamer guess then return scores
