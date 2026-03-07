@@ -14,7 +14,7 @@
       </div>
     </transition>
     <transition name="scoreboard_modal">
-      <div v-if="hideAndSeekBannerVisible" class="cg-hide-and-seek-banner">
+      <div v-if="hideAndSeekBannerVisible" class="cg-hide-and-seek-info">
         Location by {{ hideAndSeekUser }}
       </div>
     </transition>
@@ -146,7 +146,7 @@ const isMultiGuess = shallowRef<boolean>(false)
 const isBRMode = shallowRef<boolean>(false)
 const modeHelp = shallowRef<string[]>([])
 const guessMarkersLimit = shallowRef<number | null>(null)
-const currentLocation = shallowRef<LatLng | null>(null)
+const currentLocation = shallowRef<Location_ | null>(null)
 const gameResultLocations = shallowRef<Location_[] | null>(null)
 
 const hideAndSeekBannerVisible = shallowRef(false)
@@ -154,6 +154,85 @@ const hideAndSeekUser = shallowRef('')
 
 var MWStreetViewInstance
 let spinInterval: NodeJS.Timeout | null = null
+let enforcerInterval: NodeJS.Timeout | null = null
+
+function locationEnforcer(target: Location_) {
+  if (enforcerInterval) clearInterval(enforcerInterval)
+  
+  let attempts = 0
+  const maxAttempts = 5 // 5 seconds (10 * 500ms)
+
+  enforcerInterval = setInterval(() => {
+    attempts++
+    if (attempts > maxAttempts || gameState.value === 'round-results' || gameState.value === 'none') {
+      if (enforcerInterval) clearInterval(enforcerInterval)
+      enforcerInterval = null
+      return
+    }
+
+    if (!MWStreetViewInstance || !target.panoId) return
+
+    try {
+      const currentPano = MWStreetViewInstance.getPano()
+      if (currentPano !== target.panoId) {
+        console.log(`[Frame] Enforcer: Pano mismatch detected (current: ${currentPano}, target: ${target.panoId}). Re-applying custom location. Attempt ${attempts}/${maxAttempts}`)
+        MWStreetViewInstance.setPano(target.panoId)
+        MWStreetViewInstance.setPov({
+          heading: target.heading,
+          pitch: target.pitch
+        })
+        if (target.zoom) {
+          MWStreetViewInstance.setZoom(target.zoom)
+        }
+      }
+    } catch (e) {
+      console.error("[Frame] Enforcer error:", e)
+    }
+  }, 2000)
+}
+
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (e.key.toLowerCase() === 'r' && hideAndSeekBannerVisible.value && currentLocation.value) {
+    if (
+      document.activeElement instanceof HTMLInputElement ||
+      document.activeElement instanceof HTMLTextAreaElement ||
+      (document.activeElement as HTMLElement)?.isContentEditable
+    ) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+    e.stopImmediatePropagation()
+    
+    window.setTimeout((cl = currentLocation)=>{
+      if(cl == null)
+        return
+      if(cl.value == null)
+        return
+      
+      if (cl.value.panoId) {
+        MWStreetViewInstance.setPano(cl.value.panoId)
+      } else {
+        MWStreetViewInstance.setPosition({
+          lat: cl.value.lat,
+          lng: cl.value.lng
+        })
+      }
+
+      MWStreetViewInstance.setPov({
+        heading: cl.value.heading,
+        pitch: cl.value.pitch
+      })
+
+      // if (cl.value.zoom) {
+      //   MWStreetViewInstance.setZoom(cl.value.zoom)
+      // }
+    },500)
+    
+    console.log('[Frame] Manual reset intercepted and custom location re-applied')
+  }
+}
 
 // Make sure game mode is not set to 'challenge'
 setLocalStorage('quickplay-playtype', 'single')
@@ -279,14 +358,27 @@ onBeforeUnmount(
     // Force map update if in Hide and Seek mode (or if location is overridden)
     if (location) {
         if (location.panoId) {
-            console.log("[Frame] Attempting to set Pano ID:", location.panoId)
-            try {
-                MWStreetViewInstance.setPano(location.panoId)
-                console.log("[Frame] setPano called successfully")
-            } catch (e) {
-                console.error("[Frame] Error calling setPano:", e)
+            console.log("[Frame] Attempting to set Pano ID in onGameStarted:", location.panoId)
+            if (!MWStreetViewInstance) {
+                console.warn("[Frame] MWStreetViewInstance is not defined yet!")
+                return
             }
-        } else if (location.lat && location.lng) {
+            try {
+                const currentPano = MWStreetViewInstance.getPano()
+                console.log("[Frame] Current Pano:", currentPano, "Target Pano:", location.panoId)
+                if (currentPano !== location.panoId) {
+                    MWStreetViewInstance.setPano(location.panoId)
+                    console.log("[Frame] setPano called successfully")
+                } else {
+                    console.log("[Frame] Pano already set correctly, skipping setPano")
+                }
+                // Start enforcement
+                locationEnforcer(location)
+            } catch (e) {
+                console.error("[Frame] Error calling getPano/setPano:", e)
+            }
+        }
+ else if (location.lat && location.lng) {
             console.log("[Frame] Attempting to set Position:", location.lat, location.lng)
             try {
                 MWStreetViewInstance.setPosition({ lat: location.lat, lng: location.lng })
@@ -392,8 +484,18 @@ onBeforeUnmount(
 
     if (location && location.panoId) {
        console.log("[Frame] Forcing Pano update in onRefreshRound:", location.panoId)
+       if (!MWStreetViewInstance) {
+           console.warn("[Frame] MWStreetViewInstance is not defined in onRefreshRound!")
+           return
+       }
        try {
-           MWStreetViewInstance.setPano(location.panoId)
+           const currentPano = MWStreetViewInstance.getPano()
+           console.log("[Frame] onRefreshRound comparison: current=", currentPano, "target=", location.panoId)
+           if (currentPano !== location.panoId) {
+               MWStreetViewInstance.setPano(location.panoId)
+           }
+           // Start enforcement
+           locationEnforcer(location)
        } catch (e) {
            console.error("[Frame] Error setting Pano:", e)
        }
@@ -405,9 +507,6 @@ onBeforeUnmount(
   chatguessrApi.onShowHideAndSeekBanner((user) => {
     hideAndSeekUser.value = user
     hideAndSeekBannerVisible.value = true
-    setTimeout(() => {
-      hideAndSeekBannerVisible.value = false
-    }, 10000)
   })
 )
 declare global {
@@ -630,6 +729,11 @@ onBeforeUnmount(
   chatguessrApi.onGameQuit(() => {
     gameState.value = 'none'
     rendererApi.clearMarkers()
+    hideAndSeekBannerVisible.value = false
+    if (enforcerInterval) {
+      clearInterval(enforcerInterval)
+      enforcerInterval = null
+    }
   })
 )
 
@@ -666,6 +770,7 @@ onBeforeUnmount(
 
     rendererApi.drawRoundResults(location, roundResults, _guessMarkersLimit)
     scoreboard.value!.showRoundResults(round, roundResults)
+    hideAndSeekBannerVisible.value = false
   })
 )
 
@@ -815,15 +920,6 @@ async function onStreamerRandomplonk() {
     }, 200)
 }
 
-  onBeforeUnmount(
-    chatguessrApi.onShowHideAndSeekBanner((user: string) => {
-      hideAndSeekUser.value = user
-      hideAndSeekBannerVisible.value = true
-      setTimeout(() => {
-        hideAndSeekBannerVisible.value = false
-      }, 5000)
-    })
-  )
 
 /** Load and update twitch connection state. */
 const twitchConnectionState = useTwitchConnectionState()
@@ -831,6 +927,7 @@ function useTwitchConnectionState() {
   const conn = shallowRef<TwitchConnectionState>({ state: 'disconnected' })
 
   onMounted(async () => {
+    window.addEventListener('keydown', handleGlobalKeydown, true)
     const state = await chatguessrApi.getTwitchConnectionState()
     conn.value = state
 
@@ -906,6 +1003,10 @@ console.log(MWStreetViewInstance, "MWStreetViewInstance")
       conn.value = { state: 'error', error: err }
     })
   )
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('keydown', handleGlobalKeydown, true)
+  })
 
   return conn
 }
@@ -995,20 +1096,18 @@ function useSocketConnectionState() {
 }
 
 
-.cg-hide-and-seek-banner {
+.cg-hide-and-seek-info {
   position: absolute;
-  top: 20%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.7);
+  bottom: 1rem;
+  left: 1rem;
+  background: rgba(0, 0, 0, 0.6);
   color: white;
-  padding: 1rem 2rem;
-  border-radius: 10px;
-  font-size: 2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  font-size: 1rem;
   z-index: 100;
   pointer-events: none;
-  border: 2px solid white;
-  text-shadow: 2px 2px 4px #000000;
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 </style>

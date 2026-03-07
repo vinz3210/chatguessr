@@ -5,6 +5,7 @@ import { io } from 'socket.io-client'
 import Game from './Game'
 import TwitchBackend from './utils/useTwitchJS'
 import { settings, saveSettings } from './utils/useSettings'
+import { HideSeekDatabase } from './utils/HideSeekDatabase'
 import countryIso from 'coordinate_to_country'
 
 import {
@@ -63,14 +64,18 @@ export default class GameHandler {
 
   #refreshingSeed: boolean = false
 
-  #hideAndSeekQueue: { user: string; location: HideAndSeekLocation }[] = []
+  #hideAndSeekQueue: { id: string; user: string; location: HideAndSeekLocation }[] = []
+
+  #hideseekDb: HideSeekDatabase
 
   constructor(
     db: Database,
+    hideseekDb: HideSeekDatabase,
     win: Electron.BrowserWindow,
     options: { requestAuthentication: () => Promise<void> }
   ) {
     this.#db = db
+    this.#hideseekDb = hideseekDb
     this.#win = win
     this.#backend = undefined
     this.#socket = undefined
@@ -82,6 +87,9 @@ export default class GameHandler {
     this.#pay2WinUsers = []
     this.#russianHitmans = []
     this.TMPZ = false
+
+    this.#hideAndSeekQueue = this.#hideseekDb.getUnusedLocations()
+
     this.init()
   }
 
@@ -113,7 +121,9 @@ export default class GameHandler {
         const randomIndex = Math.floor(Math.random() * this.#hideAndSeekQueue.length)
         const nextLoc = this.#hideAndSeekQueue.splice(randomIndex, 1)[0]
         if (nextLoc) {
+          console.log('################################ new location loaded')
           if (settings.debugMode) console.log(`[DEBUG] Overriding location for next round with:`, nextLoc)
+          this.#hideseekDb.markLocationUsed(nextLoc.id)
           await this.#game.overrideLocation({
             lat: nextLoc.location.lat,
             lng: nextLoc.location.lng,
@@ -518,7 +528,9 @@ export default class GameHandler {
                 const randomIndex = Math.floor(Math.random() * this.#hideAndSeekQueue.length)
                 const nextLoc = this.#hideAndSeekQueue.splice(randomIndex, 1)[0]
                 if (nextLoc) {
+                  console.log('################################ new location loaded')
                   if (settings.debugMode) console.log(`[DEBUG] Overriding location with:`, nextLoc)
+                  this.#hideseekDb.markLocationUsed(nextLoc.id)
                   await this.#game.overrideLocation({
                     lat: nextLoc.location.lat,
                     lng: nextLoc.location.lng,
@@ -584,7 +596,8 @@ export default class GameHandler {
       }
     })
 
-    this.#win.webContents.on('did-frame-finish-load', () => {
+    this.#win.webContents.on('did-frame-finish-load', (_event, isMainFrame) => {
+      if (settings.debugMode) console.log(`[DEBUG] did-frame-finish-load: isMainFrame=${isMainFrame}`)
       if (!this.#game.isInGame) {
         return
       }
@@ -974,7 +987,8 @@ export default class GameHandler {
           }
 
           if (params.lat !== 0 || params.lng !== 0) {
-            this.#hideAndSeekQueue.push({ user: user, location: params })
+            const id = this.#hideseekDb.saveLocation(user, params)
+            this.#hideAndSeekQueue.push({ id, user: user, location: params })
             const msg = `@${user} Location added to Hide and Seek queue! (${this.#hideAndSeekQueue.length} in queue)`
             this.#backend?.sendMessage(msg)
             if (settings.debugMode) console.log(`[DEBUG] ${msg}`)

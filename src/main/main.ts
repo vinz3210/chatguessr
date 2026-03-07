@@ -7,6 +7,7 @@ import createMainWindow from './MainWindow'
 import createAuthWindow from '../auth/AuthWindow'
 import GameHandler from './GameHandler'
 import { database } from './utils/Database'
+import { hideseekDatabase } from './utils/HideSeekDatabase'
 import { supabase } from './utils/useSupabase'
 import { store } from './utils/store'
 import { loadCustomFlags, findFlagFile } from './lib/flags/flags'
@@ -18,6 +19,9 @@ const appDataPath = app.getPath('userData')
 const dbPath = join(appDataPath, 'scores.db')
 const db = database(dbPath)
 
+const hideseekDbPath = join(appDataPath, 'hideseek.db')
+const hideseekDb = hideseekDatabase(hideseekDbPath)
+
 // This method will be called when Electron has finished initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
@@ -26,7 +30,7 @@ app.whenReady().then(async () => {
 
   const mainWindow = createMainWindow()
 
-  const gameHandler = new GameHandler(db, mainWindow, {
+  const gameHandler = new GameHandler(db, hideseekDb, mainWindow, {
     async requestAuthentication() {
       await authenticateWithTwitch(gameHandler, mainWindow)
     }
