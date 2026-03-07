@@ -66,6 +66,8 @@ export default class GameHandler {
 
   #hideAndSeekQueue: { id: string; user: string; location: HideAndSeekLocation }[] = []
 
+  #hideAndSeekUserCounts: Map<string, number> = new Map()
+
   #hideseekDb: HideSeekDatabase
 
   constructor(
@@ -115,27 +117,22 @@ export default class GameHandler {
   }
 
   async nextRound(isRestartClick: boolean = false) {
-    if (settings.isHideAndSeekMode) {
+    if (settings.isHideAndSeekMode && !this.#game.isFinished) {
       if (settings.debugMode) console.log(`[DEBUG] Starting next round in Hide and Seek mode. Queue length: ${this.#hideAndSeekQueue.length}`)
-      if (this.#hideAndSeekQueue.length > 0) {
-        const randomIndex = Math.floor(Math.random() * this.#hideAndSeekQueue.length)
-        const nextLoc = this.#hideAndSeekQueue.splice(randomIndex, 1)[0]
-        if (nextLoc) {
-          console.log('################################ new location loaded')
-          if (settings.debugMode) console.log(`[DEBUG] Overriding location for next round with:`, nextLoc)
-          this.#hideseekDb.markLocationUsed(nextLoc.id)
-          await this.#game.overrideLocation({
-            lat: nextLoc.location.lat,
-            lng: nextLoc.location.lng,
-            panoId: nextLoc.location.pano,
-            heading: nextLoc.location.heading,
-            pitch: nextLoc.location.pitch,
-            zoom: nextLoc.location.zoom,
-          })
-          this.#win.webContents.send('show-hide-and-seek-banner', nextLoc.user)
-        }
-      } else {
-        if (settings.debugMode) console.log(`[DEBUG] Hide and Seek queue is empty. Using default location.`)
+      const nextLoc = this.#selectWeightedHideAndSeekLocation()
+      if (nextLoc) {
+        console.log('################################ new location loaded')
+        if (settings.debugMode) console.log(`[DEBUG] Overriding location for next round with:`, nextLoc)
+        this.#hideseekDb.markLocationUsed(nextLoc.id)
+        await this.#game.overrideLocation({
+          lat: nextLoc.location.lat,
+          lng: nextLoc.location.lng,
+          panoId: nextLoc.location.pano,
+          heading: nextLoc.location.heading,
+          pitch: nextLoc.location.pitch,
+          zoom: nextLoc.location.zoom,
+        })
+        this.#win.webContents.send('show-hide-and-seek-banner', nextLoc.user)
       }
     }
 
@@ -522,25 +519,22 @@ export default class GameHandler {
         this.#game
           .start(url, settings.isMultiGuess, this.#battleRoyaleCounter)
           .then(async () => {
-            if (settings.isHideAndSeekMode) {
+            if (settings.isHideAndSeekMode && !this.#game.isFinished) {
               if (settings.debugMode) console.log(`[DEBUG] Game started in Hide and Seek mode. Queue length: ${this.#hideAndSeekQueue.length}`)
-              if (this.#hideAndSeekQueue.length > 0) {
-                const randomIndex = Math.floor(Math.random() * this.#hideAndSeekQueue.length)
-                const nextLoc = this.#hideAndSeekQueue.splice(randomIndex, 1)[0]
-                if (nextLoc) {
-                  console.log('################################ new location loaded')
-                  if (settings.debugMode) console.log(`[DEBUG] Overriding location with:`, nextLoc)
-                  this.#hideseekDb.markLocationUsed(nextLoc.id)
-                  await this.#game.overrideLocation({
-                    lat: nextLoc.location.lat,
-                    lng: nextLoc.location.lng,
-                    panoId: nextLoc.location.pano,
-                    heading: nextLoc.location.heading,
-                    pitch: nextLoc.location.pitch,
-                    zoom: nextLoc.location.zoom,
-                  })
-                  this.#win.webContents.send('show-hide-and-seek-banner', nextLoc.user)
-                }
+              const nextLoc = this.#selectWeightedHideAndSeekLocation()
+              if (nextLoc) {
+                console.log('################################ new location loaded')
+                if (settings.debugMode) console.log(`[DEBUG] Overriding location with:`, nextLoc)
+                this.#hideseekDb.markLocationUsed(nextLoc.id)
+                await this.#game.overrideLocation({
+                  lat: nextLoc.location.lat,
+                  lng: nextLoc.location.lng,
+                  panoId: nextLoc.location.pano,
+                  heading: nextLoc.location.heading,
+                  pitch: nextLoc.location.pitch,
+                  zoom: nextLoc.location.zoom,
+                })
+                this.#win.webContents.send('show-hide-and-seek-banner', nextLoc.user)
               } else {
                 if (settings.debugMode) console.log(`[DEBUG] Hide and Seek queue is empty. Using default location.`)
               }
@@ -980,7 +974,7 @@ export default class GameHandler {
 
           const user = userstate['display-name'] || userstate.username || 'Unknown'
           const userCount = this.#hideAndSeekQueue.filter(item => item.user === user).length
-          if (userCount >= 5) {
+          if (userCount >= 15) {
             this.#backend?.sendMessage(`@${user} You have defined ${userCount} locations in the queue. Please wait for them to be played before adding more.`)
             if (settings.debugMode) console.log(`[DEBUG] User ${user} has too many locations in queue: ${userCount}`)
             return
@@ -1689,5 +1683,38 @@ export default class GameHandler {
     const bannedUsers = this.#db.getBannedUsers()
     const isBanned = bannedUsers.some((user) => user.username.toLowerCase() === username.toLowerCase())
     return isBanned
+  }
+
+  #selectWeightedHideAndSeekLocation() {
+    if (this.#hideAndSeekQueue.length === 0) {
+      return null
+    }
+
+    // Calculate weights for each location in the queue
+    const weights = this.#hideAndSeekQueue.map((item) => {
+      const count = this.#hideAndSeekUserCounts.get(item.user) || 0
+      return 1 / (1 + count)
+    })
+
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0)
+    let random = Math.random() * totalWeight
+
+    for (let i = 0; i < this.#hideAndSeekQueue.length; i++) {
+      random -= weights[i]
+      if (random <= 0) {
+        const selected = this.#hideAndSeekQueue.splice(i, 1)[0]
+        const currentCount = this.#hideAndSeekUserCounts.get(selected.user) || 0
+        this.#hideAndSeekUserCounts.set(selected.user, currentCount + 1)
+
+        if (settings.debugMode) {
+          console.log(`[DEBUG] Weighted selection: picked ${selected.user} (previous session count: ${currentCount}). New count: ${currentCount + 1}`)
+        }
+
+        return selected
+      }
+    }
+
+    // Fallback (should not happen if logic is correct)
+    return this.#hideAndSeekQueue.splice(0, 1)[0]
   }
 }
