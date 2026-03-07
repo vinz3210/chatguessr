@@ -120,7 +120,7 @@ export const chatguessrApi = {
   onZoomOut(callback: (value) => void) {
     return ipcRendererOn('zoom-out', callback)
   },
-  onRetrieveMyLastLoc(callback: (location: Location_, username:string, locationNumber: number) => void) {
+  onRetrieveMyLastLoc(callback: (location: Location_, username: string, locationNumber: number) => void) {
     return ipcRendererOn('retrieve-my-last-loc', callback)
   },
   onShowRoundResults(
@@ -172,7 +172,7 @@ export const chatguessrApi = {
 
   getTwitchConnectionState(): Promise<TwitchConnectionState> {
     return ipcRenderer.invoke('get-twitch-connection-state')
-  }, 
+  },
   getRandomPlonkLatLng(): Promise<LatLng> {
     return ipcRenderer.invoke('get-streamer-random-plonk-lat-lng')
   },
@@ -196,6 +196,10 @@ export const chatguessrApi = {
 
   onSocketDisconnected(callback: () => void) {
     return ipcRendererOn('socket-disconnected', callback)
+  },
+
+  onShowHideAndSeekBanner(callback: (user: string) => void) {
+    return ipcRendererOn('show-hide-and-seek-banner', callback)
   },
 
   getCurrentVersion(): Promise<string> {

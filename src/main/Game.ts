@@ -114,7 +114,7 @@ export default class Game {
     this.randomRoundMultiplier = Math.round(this.randomRoundMultiplier * 100) / 100
 
     console.log("about to send random round multiplier", this.randomRoundMultiplier)
-//    this.sendMultiplierToFrontend(this.randomRoundMultiplier)
+    //    this.sendMultiplierToFrontend(this.randomRoundMultiplier)
     return this.randomRoundMultiplier
   }
 
@@ -138,13 +138,13 @@ export default class Game {
     this.isMultiGuess = isMultiGuess
     if (this.#url === url) {
       await this.refreshSeed({
-        disappointed:{
+        disappointed: {
           callbacks: {},
         },
-        pay2Win:{
+        pay2Win: {
           callbacks: {},
         }
-      },brCounter = brCounter)
+      }, brCounter = brCounter)
     } else {
       this.#url = url
       this.seed = await this.#getSeed()
@@ -154,7 +154,7 @@ export default class Game {
 
       try {
         this.#db.createGame(this.seed)
-        this.#roundId = this.#db.createRound(this.seed.token, this.seed.rounds[0], this.invertScoring?1:0)
+        this.#roundId = this.#db.createRound(this.seed.token, this.seed.rounds[0], this.invertScoring ? 1 : 0)
       } catch (err) {
         // In this case we are restoring an existing game.
         if (err instanceof Error && err.message.includes('UNIQUE constraint failed: games.id')) {
@@ -177,7 +177,7 @@ export default class Game {
     this.closeGuesses()
   }
 
-  getRoundId(){
+  getRoundId() {
     return this.#roundId
   }
 
@@ -193,7 +193,7 @@ export default class Game {
   }
 
   // @ts-ignore
-  async refreshSeed(callbackFunctions: redeemCallbackFunctions = {}, brCounter: { [key: string]: number }) {
+  async refreshSeed(callbackFunctions: redeemCallbackFunctions = {}, brCounter: { [key: string]: number }, isHideAndSeekMode: boolean = false) {
     const newSeed = await this.#getSeed()
     let omitBroadcasterGuess = false
 
@@ -205,35 +205,49 @@ export default class Game {
           if (key === "BROADCASTER") {
             omitBroadcasterGuess = true
           }
-          if(Object.keys(callbackFunctions).indexOf("pay2Win") !== -1){
-            if(Object.keys(callbackFunctions.pay2Win.callbacks).indexOf(key) === -1){
+          if (Object.keys(callbackFunctions).indexOf("pay2Win") !== -1) {
+            if (Object.keys(callbackFunctions.pay2Win.callbacks).indexOf(key) === -1) {
               callbackFunctions.disappointed.callbacks[key]()
             }
           }
-          
+
         })
       }
 
-      if(Object.keys(callbackFunctions).indexOf("pay2Win") !== -1){
+      if (Object.keys(callbackFunctions).indexOf("pay2Win") !== -1) {
         Object.keys(callbackFunctions.pay2Win.callbacks).forEach((key) => {
           if (key === "BROADCASTER") {
             omitBroadcasterGuess = true
           }
           callbackFunctions.pay2Win.callbacks[key]()
         })
-      
+
       }
 
-
-
+      const currentLoc = this.getLocation()
       this.seed = newSeed
+
+      if (isHideAndSeekMode) {
+        // Restore the overridden location so scoring is correct
+        this.seed.rounds[this.seed.rounds.length - 1] = {
+          ...this.seed.rounds[this.seed.rounds.length - 1],
+          lat: currentLoc.lat,
+          lng: currentLoc.lng,
+          panoId: currentLoc.panoId,
+          heading: currentLoc.heading,
+          pitch: currentLoc.pitch,
+          zoom: currentLoc.zoom,
+          streakLocationCode: (currentLoc as GameRound).streakLocationCode
+        }
+      }
+
       const location = this.location
       await this.#makeGuess(omitBroadcasterGuess)
       omitBroadcasterGuess = false
       const roundResults = this.getRoundResults()
 
       if (this.seed!.state !== 'finished') {
-        this.#roundId = this.#db.createRound(this.seed!.token, this.seed.rounds.at(-1)!, this.invertScoring?1:0)
+        this.#roundId = this.#db.createRound(this.seed!.token, this.seed.rounds.at(-1)!, this.invertScoring ? 1 : 0)
         this.#assignStreakCode()
       } else {
         this.#roundId = undefined
@@ -242,8 +256,12 @@ export default class Game {
       return { location, roundResults }
       // Else, if only the loc has changed, the location was skipped, replace current loc
     } else if (newSeed && this.#locHasChanged(newSeed)) {
+      if (isHideAndSeekMode) {
+        // Ignore native location updates in Hide and Seek mode
+        return false
+      }
       this.seed = newSeed
-      this.#roundId = this.#db.createRound(this.seed!.token, this.seed.rounds.at(-1)!, this.invertScoring?1:0)
+      this.#roundId = this.#db.createRound(this.seed!.token, this.seed.rounds.at(-1)!, this.invertScoring ? 1 : 0)
 
       this.#assignStreakCode()
 
@@ -253,7 +271,7 @@ export default class Game {
 
   async #getSeed() {
     // generate new randomMultiplier and send to frontend
-    if(this.randomRoundMultiplier === 0){
+    if (this.randomRoundMultiplier === 0) {
       this.randomRoundMultiplier = this.setRandomRoundMultiplier()
     }
     return this.#url ? await fetchSeed(this.#url) : undefined
@@ -286,7 +304,7 @@ export default class Game {
       guesses,
       async (guess) => {
         // if streak is correct and it is the first plonk, increase streak
-        if (guess.streakCode === this.#streakCode ) {
+        if (guess.streakCode === this.#streakCode) {
           this.#db.addUserStreak(guess.player.userId, this.#roundId!)
         } else {
           this.#db.resetUserStreak(guess.player.userId)
@@ -326,9 +344,9 @@ export default class Game {
     let numberofGamesInRoundFromRoundId = this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!)
     console.log("numberofGamesInRoundFromRoundId", numberofGamesInRoundFromRoundId)
     var score = streamerGuess.timedOut ? 0 : calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier)
-    if(numberofGamesInRoundFromRoundId !== 1 && this.isGameOfChickenModeActivated){
+    if (numberofGamesInRoundFromRoundId !== 1 && this.isGameOfChickenModeActivated) {
       const didUserWinLastRound = this.#db.didUserWinLastRound('BROADCASTER', this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)
-      if(didUserWinLastRound){
+      if (didUserWinLastRound) {
         if (!(this.chickenMode5kGivesPoints && score == 5000))
           score = 0
       }
@@ -349,9 +367,9 @@ export default class Game {
       this.randomRoundMultiplier = this.setRandomRoundMultiplier()
     }, 1000)
   }
-  
 
-  async handleUserGuess(userstate: UserData, location: LatLng, isRandomPlonk: boolean = false, brIsAllowedToReguess = false, brCounter:number = 1, forceGuess = false): Promise<Guess> {
+
+  async handleUserGuess(userstate: UserData, location: LatLng, isRandomPlonk: boolean = false, brIsAllowedToReguess = false, brCounter: number = 1, forceGuess = false): Promise<Guess> {
     var dbUser = this.#db.getUser(userstate['user-id'])
     if (!dbUser || !isRandomPlonk) {
       dbUser = this.#db.getOrCreateUser(
@@ -367,8 +385,7 @@ export default class Game {
     if (!dbUser) throw Object.assign(new Error('Something went wrong creating dbUser'))
 
     var existingGuess = this.#db.getUserGuess(this.#roundId!, dbUser.id)
-    if (forceGuess)
-    {
+    if (forceGuess) {
       if (existingGuess) {
         this.#db.deleteGuess(existingGuess.id)
       }
@@ -386,20 +403,20 @@ export default class Game {
     const distance = haversineDistance(location, this.location!)
     const modifierMinusPointsIfWrongCountry = this.#settings.modifierMinusPointsIfWrongCountry
     let subtractedBRPoints = 0
-    if(this.#settings.isBRMode){
+    if (this.#settings.isBRMode) {
       //if(this.#settings.battleRoyaleSubtractedPoints > 0){
-      if(true){
-        subtractedBRPoints = this.#settings.battleRoyaleSubtractedPoints *  (brCounter - 1)
+      if (true) {
+        subtractedBRPoints = this.#settings.battleRoyaleSubtractedPoints * (brCounter - 1)
       }
     }
-    
+
     let numberofGamesInRoundFromRoundId = this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!)
     console.log("numberofGamesInRoundFromRoundId", numberofGamesInRoundFromRoundId)
-    var score = calculateScore(distance, this.mapScale! ,await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier)
-    if(this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!) !== 1 && this.isGameOfChickenModeActivated){
+    var score = calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier)
+    if (this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!) !== 1 && this.isGameOfChickenModeActivated) {
 
       const didUserWinLastRound = this.#db.didUserWinLastRound(dbUser.id, this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)
-      if(didUserWinLastRound){
+      if (didUserWinLastRound) {
         if (!(this.chickenMode5kGivesPoints && score == 5000))
           score = 0
       }
@@ -435,7 +452,7 @@ export default class Game {
         streak ? streak.count++ : (streak = { count: 1 })
       } else {
         streak = undefined
-        if(!this.isMultiGuess)
+        if (!this.isMultiGuess)
           this.#db.resetUserStreak(dbUser.id)
       }
     }
@@ -456,7 +473,7 @@ export default class Game {
     if (this.isMultiGuess && existingGuess) {
       this.#db.updateGuess(existingGuess.id, guess)
       modified = true
-    } else if(this.#settings.isBRMode && existingGuess){
+    } else if (this.#settings.isBRMode && existingGuess) {
       this.#db.updateGuess(existingGuess.id, guess)
       modified = true
     }
@@ -506,118 +523,113 @@ export default class Game {
   }
   getModeHelpStartOfRound(): string[] {
     let modeHelp = this.getModeHelp()
-    
+
     // if(this.#settings.showRandomMultisOnlyAtEndOfRound){
     //   modeHelp = modeHelp.filter((part) => !part.startsWith("Random Multiplier"))
     // }
     return modeHelp
-    }
+  }
   getModeHelpEndOfRound(): string[] {
     return this.getModeHelp()
   }
 
   getModeHelp(): string[] {
     var parts: string[] = []
-    if (this.#settings.invertScoring)
-    {
+    if (this.#settings.invertScoring) {
       parts.push("Inverted scoring (Antipode)")
     }
 
-    if (this.#settings.exclusiveMode)
-      {
-        parts.push("Exclusive mode")
-      }
-  
-    if (this.#settings.isClosestInWrongCountryModeActivated)
-    {
+    if (this.#settings.exclusiveMode) {
+      parts.push("Exclusive mode")
+    }
+
+    if (this.#settings.isClosestInWrongCountryModeActivated) {
       parts.push("Wrong country only")
     }
 
-    if (this.#settings.isGameOfChickenModeActivated)
-    {
+    if (this.#settings.isGameOfChickenModeActivated) {
       parts.push("Game of chicken 🐔")
 
-      if (this.#settings.chickenMode5kGivesPoints){
+      if (this.#settings.chickenMode5kGivesPoints) {
         parts.push(`Chicken can 5k`)
       }
-      if (this.#settings.chickenModeSurvivesWith5k){
+      if (this.#settings.chickenModeSurvivesWith5k) {
         parts.push(`5k avoids chicken`)
       }
     }
-    if(this.#settings.isBRMode){
+    if (this.#settings.isBRMode) {
       parts.push("Battle Royale " + this.#settings.battleRoyaleReguessLimit + " guesses")
       // if(this.#settings.battleRoyaleSubtractedPoints > 0){
       //   parts.push("BR -" + this.#settings.battleRoyaleSubtractedPoints + " points per guess")
       // }
-      if(this.#settings.battleRoyaleSubtractedPoints > 0){
+      if (this.#settings.battleRoyaleSubtractedPoints > 0) {
         parts.push("BR -" + this.#settings.battleRoyaleSubtractedPoints + " points per guess")
       }
-      if(this.#settings.battleRoyaleSubtractedPoints < 0){
-        parts.push("BR +" + this.#settings.battleRoyaleSubtractedPoints*-1 + " points per guess")
+      if (this.#settings.battleRoyaleSubtractedPoints < 0) {
+        parts.push("BR +" + this.#settings.battleRoyaleSubtractedPoints * -1 + " points per guess")
       }
     }
-    if(this.#settings.allowMinus){
+    if (this.#settings.allowMinus) {
       parts.push("Points can go negative")
     }
 
 
-    if (this.#settings.isDartsMode)
-    {
-      const bustSign = this.#settings.isDartsModeBust ? '≤': ''
+    if (this.#settings.isDartsMode) {
+      const bustSign = this.#settings.isDartsModeBust ? '≤' : ''
       parts.push(`Darts 🎯(${bustSign}${this.#settings.dartsTargetScore})`)
     }
-    if (this.#settings.waterPlonkMode !== "normal"){
-      if(this.#settings.waterPlonkMode === "illegal"){
+    if (this.#settings.waterPlonkMode !== "normal") {
+      if (this.#settings.waterPlonkMode === "illegal") {
         parts.push("🌊❌")
       }
-      if(this.#settings.waterPlonkMode === "mandatory"){
+      if (this.#settings.waterPlonkMode === "mandatory") {
         parts.push("🌊❗")
       }
     }
-    if (this.#settings.countdownMode !== "normal"){
-      if(this.#settings.countdownMode === "countdown"){
+    if (this.#settings.countdownMode !== "normal") {
+      if (this.#settings.countdownMode === "countdown") {
         parts.push("Countdown")
       }
 
-      if(this.#settings.countdownMode === "countup"){
+      if (this.#settings.countdownMode === "countup") {
         parts.push("Countup")
       }
 
-      if(this.#settings.countdownMode === "alphabeticalAZ"){
+      if (this.#settings.countdownMode === "alphabeticalAZ") {
         parts.push("Alphabetical A=>Z")
       }
 
-      if(this.#settings.countdownMode === "alphabeticalZA"){
+      if (this.#settings.countdownMode === "alphabeticalZA") {
         parts.push("Alphabetical Z=>A")
       }
 
-      if(this.#settings.countdownMode === "abc"){
+      if (this.#settings.countdownMode === "abc") {
         parts.push("ABC-Mode: " + this.#settings.ABCModeLetters.split("").join("").toUpperCase())
       }
       console.log("####################################################################")
       console.log(this.#settings)
 
+    }
+
+    if (this.#settings.roundMultis == "multiMerchant") {
+      parts.push("Multi-Merchant")
+    }
+    if (this.#settings.roundMultis == "random") {
+      if (this.#settings.showRandomMultisOnlyAtEndOfRound) {
+        parts.push("<span style='display:none'>Random Multiplier x" + this.randomRoundMultiplier + "</span>")
       }
-    
-      if(this.#settings.roundMultis == "multiMerchant"){
-        parts.push("Multi-Merchant")
+      else {
+        parts.push("Random Multiplier x" + this.randomRoundMultiplier)
       }
-      if(this.#settings.roundMultis == "random"){
-        if(this.#settings.showRandomMultisOnlyAtEndOfRound){
-          parts.push("<span style='display:none'>Random Multiplier x" + this.randomRoundMultiplier+"</span>")
-          }
-        else{
-          parts.push("Random Multiplier x" + this.randomRoundMultiplier)
-        }
+    }
+    if (this.#settings.modifierMinusPointsIfWrongCountry !== 0) {
+      if (this.#settings.modifierMinusPointsIfWrongCountry > 0) {
+        parts.push("Wrong country -" + this.#settings.modifierMinusPointsIfWrongCountry + " points")
       }
-      if(this.#settings.modifierMinusPointsIfWrongCountry !== 0){
-        if(this.#settings.modifierMinusPointsIfWrongCountry > 0){
-          parts.push("Wrong country -"+this.#settings.modifierMinusPointsIfWrongCountry + " points")
-        }
-        if(this.#settings.modifierMinusPointsIfWrongCountry < 0){
-          parts.push("Wrong country +" + this.#settings.modifierMinusPointsIfWrongCountry*-1 + " points")
-        }
+      if (this.#settings.modifierMinusPointsIfWrongCountry < 0) {
+        parts.push("Wrong country +" + this.#settings.modifierMinusPointsIfWrongCountry * -1 + " points")
       }
+    }
     return parts
   }
 
@@ -632,22 +644,22 @@ export default class Game {
    * Get the scores for the current round, sorted by distance from closest to farthest away.
    */
   getRoundResults() {
-    if(this.#settings.exclusiveMode){
+    if (this.#settings.exclusiveMode) {
       this.#db.updateGuessesToExclusive(this.#roundId!)
     }
     // if(this.#settings.isBRMode){
     //   console.log(brCounter)
     //   //this.#db.updateGuessesToBR(this.#roundId!, brCounter, 0, false)////////
     // }
-    
+
     return this.#db.getRoundResults(this.#roundId!)
   }
 
   finishGame() {
     return this.#db.finishGame(this.seed!.token)
   }
-  setGameWinner(userId: string | undefined){
-    if(!userId){
+  setGameWinner(userId: string | undefined) {
+    if (!userId) {
       return
     }
     return this.#db.setGameWinner(this.seed!.token, userId)
@@ -678,5 +690,21 @@ export default class Game {
 
   get round() {
     return this.seed!.round
+  }
+
+  async overrideLocation(location: Location_) {
+    if (!this.seed) return
+
+    // Update the round with the new location immediately so getLocation() returns the correct coordinates
+    this.seed.rounds[this.seed.rounds.length - 1] = {
+      ...location,
+      streakLocationCode: null // Temporary, will be updated after calculation
+    }
+
+    // This will fetch the location from the seed (which we just updated), calculate the streak code, and update this.location property
+    await this.#assignStreakCode()
+
+    // Now update the round again with the correct streak code
+    this.seed.rounds[this.seed.rounds.length - 1].streakLocationCode = this.#streakCode ?? null
   }
 }

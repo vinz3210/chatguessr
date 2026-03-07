@@ -13,6 +13,11 @@
         />
       </div>
     </transition>
+    <transition name="scoreboard_modal">
+      <div v-if="hideAndSeekBannerVisible" class="cg-hide-and-seek-banner">
+        Location by {{ hideAndSeekUser }}
+      </div>
+    </transition>
     <div id="debugElement" style="background: hotpink; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 1.5rem; display:none;">
       <b>Debug stuff!</b>
       <div id="map" style="height: 400px; width: 100%;"></div>
@@ -144,6 +149,9 @@ const guessMarkersLimit = shallowRef<number | null>(null)
 const currentLocation = shallowRef<LatLng | null>(null)
 const gameResultLocations = shallowRef<Location_[] | null>(null)
 
+const hideAndSeekBannerVisible = shallowRef(false)
+const hideAndSeekUser = shallowRef('')
+
 var MWStreetViewInstance
 let spinInterval: NodeJS.Timeout | null = null
 
@@ -254,20 +262,43 @@ onBeforeUnmount(
 
     isMultiGuess.value = _isMultiGuess
     isBRMode.value = _isBRMode
-    console.log("Frame: onGameStarted", { isMultiGuess: _isMultiGuess, isBRMode: _isBRMode })
-    console.log("Frame: scoreboard ref", scoreboard.value)
-    console.log("isBRMode", isBRMode.value)
+    console.log("[Frame] onGameStarted called")
+    console.log("[Frame] Received location:", location)
+    console.log("[Frame] isMultiGuess:", _isMultiGuess, "isBRMode:", _isBRMode, "restoredGuesses:", restoredGuesses)
     
     modeHelp.value = _modeHelp
     gameState.value = 'in-round'
     
-
-
     currentLocation.value = location
     if (satelliteMode.value.enabled) {
       rendererApi.showSatelliteMap(location)
     } else {
       rendererApi.hideSatelliteMap()
+    }
+
+    // Force map update if in Hide and Seek mode (or if location is overridden)
+    if (location) {
+        if (location.panoId) {
+            console.log("[Frame] Attempting to set Pano ID:", location.panoId)
+            try {
+                MWStreetViewInstance.setPano(location.panoId)
+                console.log("[Frame] setPano called successfully")
+            } catch (e) {
+                console.error("[Frame] Error calling setPano:", e)
+            }
+        } else if (location.lat && location.lng) {
+            console.log("[Frame] Attempting to set Position:", location.lat, location.lng)
+            try {
+                MWStreetViewInstance.setPosition({ lat: location.lat, lng: location.lng })
+                console.log("[Frame] setPosition called successfully")
+            } catch (e) {
+                console.error("[Frame] Error calling setPosition:", e)
+            }
+        } else {
+            console.warn("[Frame] Location object missing panoId or lat/lng", location)
+        }
+    } else {
+        console.error("[Frame] Received null or undefined location in onGameStarted")
     }
     
     scoreboard.value!.onStartRound()
@@ -340,18 +371,43 @@ onBeforeUnmount(
     rotationFunction()
   })
 )
+watch(currentLocation, (newVal) => {
+    console.log("[Frame] currentLocation changed to:", newVal)
+  })
+
 onBeforeUnmount(
   chatguessrApi.onRefreshRound(async(location) => {
-
     // this condition prevents gameState to switch to 'in-round' if 'onRefreshRound' is triggered (happens sometimes) on round results screen
     // this is because of "did-frame-finish-load" based logic, ideally we would want something else
     if (gameState.value !== 'round-results') gameState.value = 'in-round'
+    
+    console.log("[Frame] onRefreshRound called")
+    console.log("[Frame] Received location:", location)
+    
     //console.log(settings, "settings")
     currentLocation.value = location
     if (satelliteMode.value.enabled) {
       rendererApi.showSatelliteMap(location)
     }
-    
+
+    if (location && location.panoId) {
+       console.log("[Frame] Forcing Pano update in onRefreshRound:", location.panoId)
+       try {
+           MWStreetViewInstance.setPano(location.panoId)
+       } catch (e) {
+           console.error("[Frame] Error setting Pano:", e)
+       }
+    }
+  })
+)
+
+onBeforeUnmount(
+  chatguessrApi.onShowHideAndSeekBanner((user) => {
+    hideAndSeekUser.value = user
+    hideAndSeekBannerVisible.value = true
+    setTimeout(() => {
+      hideAndSeekBannerVisible.value = false
+    }, 10000)
   })
 )
 declare global {
@@ -759,6 +815,16 @@ async function onStreamerRandomplonk() {
     }, 200)
 }
 
+  onBeforeUnmount(
+    chatguessrApi.onShowHideAndSeekBanner((user: string) => {
+      hideAndSeekUser.value = user
+      hideAndSeekBannerVisible.value = true
+      setTimeout(() => {
+        hideAndSeekBannerVisible.value = false
+      }, 5000)
+    })
+  )
+
 /** Load and update twitch connection state. */
 const twitchConnectionState = useTwitchConnectionState()
 function useTwitchConnectionState() {
@@ -928,5 +994,21 @@ function useSocketConnectionState() {
   z-index: 2;
 }
 
+
+.cg-hide-and-seek-banner {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  font-size: 2rem;
+  z-index: 100;
+  pointer-events: none;
+  border: 2px solid white;
+  text-shadow: 2px 2px 4px #000000;
+}
 
 </style>

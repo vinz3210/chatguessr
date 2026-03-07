@@ -119,7 +119,7 @@ export function haversineDistance(mk1: LatLng, mk2: LatLng): number {
     Math.asin(
       Math.sqrt(
         Math.sin(difflat / 2) * Math.sin(difflat / 2) +
-          Math.cos(rlat1) * Math.cos(rlat2) * Math.sin(difflon / 2) * Math.sin(difflon / 2)
+        Math.cos(rlat1) * Math.cos(rlat2) * Math.sin(difflon / 2) * Math.sin(difflon / 2)
       )
     )
   return km
@@ -129,11 +129,11 @@ export function haversineDistance(mk1: LatLng, mk2: LatLng): number {
  * Returns score based on distance and scale
  */
 
-function modifyScore(score: number, modifier: number, allowMinus: boolean, roundNumber?:number, roundMultis?:string, randomRoundMultiplier?:number): number {
+function modifyScore(score: number, modifier: number, allowMinus: boolean, roundNumber?: number, roundMultis?: string, randomRoundMultiplier?: number): number {
 
   var multiModifier = 1
-  if (roundMultis == "multiMerchant"){
-    switch (roundNumber){
+  if (roundMultis == "multiMerchant") {
+    switch (roundNumber) {
       case 1:
         multiModifier = 1
         break
@@ -152,14 +152,14 @@ function modifyScore(score: number, modifier: number, allowMinus: boolean, round
     }
     score = score * multiModifier
   }
-  if (roundMultis == "random"){
-    if (randomRoundMultiplier == undefined){
+  if (roundMultis == "random") {
+    if (randomRoundMultiplier == undefined) {
       console.log("Random multiplier is undefined")
       return score
     }
     score = score * randomRoundMultiplier
   }
-  score = score + modifier 
+  score = score + modifier
   score = Math.round(score)
   if (score < 0 && !allowMinus) score = 0
 
@@ -167,10 +167,10 @@ function modifyScore(score: number, modifier: number, allowMinus: boolean, round
   return score
 }
 
-export function calculateScore(distance: number, scale: number, isCorrectCountry: boolean, isClosestInWrongCountryModeActivated: boolean,  waterPlonkMode: string, isPlonkOnLand: boolean, invertScores: boolean, modifierMinusPointsIfWrongCountry: number, isBRMode: boolean, battleRoyaleSubtractedPoints: number, allowMinus: boolean,  maxErrorDistance?:number, roundNumber?:number, roundMultis?:string, randomRoundMultiplier?:number): number {
+export function calculateScore(distance: number, scale: number, isCorrectCountry: boolean, isClosestInWrongCountryModeActivated: boolean, waterPlonkMode: string, isPlonkOnLand: boolean, invertScores: boolean, modifierMinusPointsIfWrongCountry: number, isBRMode: boolean, battleRoyaleSubtractedPoints: number, allowMinus: boolean, maxErrorDistance?: number, roundNumber?: number, roundMultis?: string, randomRoundMultiplier?: number): number {
   let modifier = 0
   if (!isCorrectCountry) modifier = - modifierMinusPointsIfWrongCountry
-  if(isBRMode && true)// battleRoyaleSubtractedPoints > 0)
+  if (isBRMode && true)// battleRoyaleSubtractedPoints > 0)
     modifier = modifier - battleRoyaleSubtractedPoints
 
   if (!maxErrorDistance) {
@@ -179,34 +179,34 @@ export function calculateScore(distance: number, scale: number, isCorrectCountry
     return modifyScore(score, modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
   }
   const score = Math.round(5000 * Math.exp(-10 * ((distance * 1000) / maxErrorDistance)))
-  
+
 
   if (isCorrectCountry && isClosestInWrongCountryModeActivated) return 0
   if (waterPlonkMode == "illegal" && !isPlonkOnLand) return 0
   if (waterPlonkMode == "mandatory" && isPlonkOnLand) return 0
-  if (!invertScores){
-    return modifyScore(score ,modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
+  if (!invertScores) {
+    return modifyScore(score, modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
   }
-  else{
-    if (distance > 15000){
-      return modifyScore(4999 - Math.round(Math.round(20015.1 - distance)*0.2052) ,modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
+  else {
+    if (distance > 15000) {
+      return modifyScore(4999 - Math.round(Math.round(20015.1 - distance) * 0.2052), modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
     }
 
-    if (distance > 7500){
-      return modifyScore(4000 - Math.round(Math.round(15000  - distance)*0.4) ,modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
+    if (distance > 7500) {
+      return modifyScore(4000 - Math.round(Math.round(15000 - distance) * 0.4), modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
     }
 
-    if (distance > 5000){
-      return modifyScore(1000 - Math.round(Math.round(7500  - distance)*0.2) ,modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
+    if (distance > 5000) {
+      return modifyScore(1000 - Math.round(Math.round(7500 - distance) * 0.2), modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
     }
 
-    if (distance > 2500){
-      return modifyScore(500 - Math.round(Math.round(5000  - distance)*0.1) ,modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
+    if (distance > 2500) {
+      return modifyScore(500 - Math.round(Math.round(5000 - distance) * 0.1), modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
     }
   }
 
-  if (distance > 100){
-    return modifyScore(250 - Math.round(Math.round(2500  - distance)*0.1) ,modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
+  if (distance > 100) {
+    return modifyScore(250 - Math.round(Math.round(2500 - distance) * 0.1), modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
   }
 
   return 0
@@ -295,6 +295,90 @@ export function checkCountryCodeValidity(countryCode: string): boolean {
 }
 
 
+
+export interface HideAndSeekLocation {
+  lat: number
+  lng: number
+  heading: number
+  pitch: number
+  zoom: number
+  pano: string
+  tags: string[]
+}
+
+/**
+ * Expands a Google Maps short URL using the provided endpoint.
+ */
+export async function expandShortUrl(shortUrl: string): Promise<string | null> {
+  const prefix = 'https://maps.app.goo.gl/'
+  if (!shortUrl.startsWith(prefix)) return null
+  const code = shortUrl.substring(prefix.length)
+
+  try {
+    const response = await axios.get(`https://vinz3210.gg/maptools/shortLinksToMap/getRedirectURL.php?shortLink=${code}`)
+    return response.data
+  } catch (error) {
+    console.error('Error expanding short URL:', error)
+    return null
+  }
+}
+
+/**
+ * Extracts parameters from a Google Maps URL.
+ */
+export function extractParamsFromURL(url: string): HideAndSeekLocation {
+  let lat = 0
+  let lng = 0
+  let heading = 0
+  let pitch = 0
+  let zoom = 0
+  let pano = ""
+  let tags: string[] = []
+
+  if (url.indexOf("extra[tags]") > -1) {
+    tags = url.split("&").filter(x => x.indexOf("extra[tags]") >= 0).map(x => x.split("=")[1])
+  }
+  if (url.includes("api=1")) {
+
+    const urlParts = url.split("&");
+    for (const part of urlParts) {
+      if (part.includes("viewpoint")) {
+        const coords = part.split("=")[1].split(",");
+        lat = parseFloat(coords[0]);
+        lng = parseFloat(coords[1]);
+      } else if (part.includes("heading")) {
+        heading = parseFloat(part.split("=")[1]);
+      } else if (part.includes("pitch")) {
+        pitch = parseFloat(part.split("=")[1]);
+      } else if (part.includes("fov")) {
+        zoom = parseFloat(part.split("=")[1]);
+      } else if (part.includes("pano")) {
+        pano = part.split("=")[1];
+      }
+    }
+  } else if (url.includes("/@")) {
+    url = decodeURIComponent(url);
+    const urlParts = url.split("&");
+    for (const part of urlParts) {
+      if (part.includes("/@")) {
+        const ppart = part.split("@")[1];
+        const coords = ppart.split(",").slice(0, 2);
+        lat = parseFloat(coords[0]);
+        lng = parseFloat(coords[1]);
+      } else if (part.includes("yaw")) {
+        heading = parseFloat(part.split("=")[1]);
+      } else if (part.includes("pitch")) {
+        pitch = parseFloat(part.split("=")[1]);
+      } else if (part.includes("fov")) {
+        zoom = parseFloat(part.split("=")[1].split("?")[0]);
+      } else if (part.includes("pano")) {
+        pano = part.split("=")[1];
+      }
+    }
+  }
+  return { lat, lng, heading, pitch, zoom, pano, tags };
+}
+
 function randomLatitudeInBounds(minLat, maxLat) {
   // when picking random coords, mongolia comes up more often then it should because of the shape of the globe
   // test with 10000 random plonks
@@ -319,12 +403,12 @@ function randomLatitudeInBounds(minLat, maxLat) {
 export async function getRandomCoordsInLandByCountryCode(countryCode: string, i: number = 0): Promise<LatLng> {
   // send message to frontend if country code is invalid
   countryCode = countryCode.toUpperCase()
-  if(!checkCountryCodeValidity(countryCode)){
+  if (!checkCountryCodeValidity(countryCode)) {
     console.log("Invalid country code")
     return { lat: 0, lng: 0 }
   }
   let countryTheCountryCodeIsIn = streakCodes[countryCode]
-  if (!countryTheCountryCodeIsIn){
+  if (!countryTheCountryCodeIsIn) {
     console.log("Country code not in streakCodes")
     return { lat: 0, lng: 0 }
   }
@@ -334,7 +418,7 @@ export async function getRandomCoordsInLandByCountryCode(countryCode: string, i:
   const lng = Math.random() * (bounds.maxLng - bounds.minLng) + bounds.minLng
   const localResults = countryIso(lat, lng, true)
   console.log("lat: " + lat + " lng: " + lng + " localResults: " + localResults + " countryTheCountryCodeIsIn: " + countryTheCountryCodeIsIn)
-  if ((!localResults.length && i < 50) || (localResults[0]!=countryTheCountryCodeIsIn && i < 50)) return await getRandomCoordsInLandByCountryCode(countryCode, i + 1)
+  if ((!localResults.length && i < 50) || (localResults[0] != countryTheCountryCodeIsIn && i < 50)) return await getRandomCoordsInLandByCountryCode(countryCode, i + 1)
   return { lat, lng }
 
 }
@@ -431,10 +515,10 @@ export async function parseUserDate(
     const day = parseInt(userDateStr.slice(6, 8))
     if (year >= 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
       timeStamp = dateToUnixTimestamp(new Date(year, month - 1, day))
-      let monthString = "0"+month.toString()
-      let dayString = "0"+day.toString()
-      monthString = monthString.substring(monthString.length-2)
-      dayString = dayString.substring(dayString.length-2)
+      let monthString = "0" + month.toString()
+      let dayString = "0" + day.toString()
+      monthString = monthString.substring(monthString.length - 2)
+      dayString = dayString.substring(dayString.length - 2)
       description = `${year}-${monthString}-${dayString}`
     }
   }
