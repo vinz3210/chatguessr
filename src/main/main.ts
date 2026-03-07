@@ -16,7 +16,7 @@ import { version } from '../../package.json'
 if (process.platform == 'win32') updateElectronApp()
 
 const appDataPath = app.getPath('userData')
-const dbPath = join(appDataPath, 'scores.db')
+const dbPath = join(appDataPath, 'hide_and_seek_scores.db')
 const db = database(dbPath)
 
 const hideseekDbPath = join(appDataPath, 'hideseek.db')
