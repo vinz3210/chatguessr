@@ -20,6 +20,11 @@ export default function createWindow() {
   })
 
   win.setMenuBarVisibility(false)
+
+  // Remove Electron identifier from user agent so Cloudflare Turnstile doesn't block login
+  const ua = win.webContents.getUserAgent().replace(/\s*Electron\/\S+/, '')
+  win.webContents.setUserAgent(ua)
+
   win.loadURL('https://www.geoguessr.com/maps/community')
 
   // Adapt all calls for api/v3/search/any to api/v3/search/map

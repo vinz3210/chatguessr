@@ -31,3 +31,6 @@ setTimeout(removeLoading, 4999)
 // Expose protected methods off of window in order to use ipcRenderer
 // without exposing the entire object
 contextBridge.exposeInMainWorld('chatguessrApi', chatguessrApi)
+
+// Make the page look like a normal Chrome browser to Cloudflare Turnstile
+contextBridge.exposeInMainWorld('chrome', { runtime: {} })
