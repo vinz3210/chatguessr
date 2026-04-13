@@ -22,8 +22,9 @@ export default function createWindow() {
   win.setMenuBarVisibility(false)
 
   // Remove Electron identifier from user agent so Cloudflare Turnstile doesn't block login
+  // Must be set on the session (not just webContents) so iframes like Turnstile also get the clean UA
   const ua = win.webContents.getUserAgent().replace(/\s*Electron\/\S+/, '')
-  win.webContents.setUserAgent(ua)
+  win.webContents.session.setUserAgent(ua)
 
   win.loadURL('https://www.geoguessr.com/maps/community')
 
