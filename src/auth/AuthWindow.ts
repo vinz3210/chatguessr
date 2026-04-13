@@ -39,6 +39,10 @@ export default async function createAuthWindow(
     }
   })
 
+  // Remove the Electron identifier from the user agent so Cloudflare Turnstile doesn't block the window
+  const ua = win.webContents.getUserAgent().replace(/\s*Electron\/\S+/, '')
+  win.webContents.setUserAgent(ua)
+
   if (options.clearStorageData) {
     await win.webContents.session.clearStorageData()
   }
