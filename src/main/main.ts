@@ -14,6 +14,9 @@ import { version } from '../../package.json'
 
 if (process.platform == 'win32') updateElectronApp()
 
+// Prevent Cloudflare Turnstile from detecting Electron via the webdriver flag
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
+
 const appDataPath = app.getPath('userData')
 const dbPath = join(appDataPath, 'scores.db')
 const db = database(dbPath)
