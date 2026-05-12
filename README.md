@@ -13,10 +13,6 @@ Be aware that it is in constant development. Releases should be stable, but if y
 
 Want to support the project? Go to <a href="https://chatguessr.com">the official ChatGuessr.com website</a>. You can find a dono link at the bottom.
 
-## Platform Support
-
-Windows only. Mac builds are currently not working.
-
 ---
 
 ## Game Modes
