@@ -31,7 +31,7 @@ Guessing in the correct country gives you 0 points. Only wrong-country plonks sc
 Scoring is reversed — the further your plonk is from the actual location, the more points you get. Closest to the antipode wins. Best played with difficult maps like Pain and Suffering or Random Pan and Zoom World.
 
 ### Exclusive Mode
-Only the player with the closest guess scores points each round. Everyone else gets 0.
+You only score if you are the only player who guessed in your country. Share a country with anyone else and you both get 0. Being close doesn't matter — picking a country nobody else thought of does.
 
 ### Countdown / Countup
 Guesses must follow a sequence based on the country name length:
@@ -125,15 +125,6 @@ A collection of visual filters and element removals, toggleable individually:
 
 ---
 
-## Twitch Channel Point Rewards
-
-These are triggered by custom channel point redemptions. The reward IDs must be configured to match your channel.
-
-- **Disappointment Island** — forces the targeted viewer to plonk at Disappointment Island (-50.607°, 165.972°)
-- **Pay2Win** — forces the redeemer to plonk at the exact correct location (guaranteed 5k)
-- **Russian Roulette** — applies a hidden random penalty or effect to the redeemer
-
----
 
 ## Commands & Settings Differences
 
