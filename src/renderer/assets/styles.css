@@ -61,6 +61,31 @@ hr {
   z-index: 9;
 }
 
+#cg-mods-controls-host {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 10000;
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 0.5rem;
+  background: rgb(16 16 28 / 92%);
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 35%);
+}
+
+#mods-controls[data-cg-floating='true'] {
+  color: var(--ds-color-white, #fff);
+}
+
+#mods-controls[data-cg-floating='true'] .cg-ncnc-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .hidden {
   visibility: hidden;
 }
