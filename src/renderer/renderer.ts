@@ -38,7 +38,7 @@ const mapPageTargetSelectors = [
 ]
 
 function isMapsPage() {
-  return /^\/(?:maps|me\/maps)(?:\/|$)/.test(window.location.pathname)
+  return /^\/maps\/[^/]+\/?$/.test(window.location.pathname)
 }
 
 function getModsControlsTarget() {
