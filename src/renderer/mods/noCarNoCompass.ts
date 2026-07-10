@@ -28,6 +28,37 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
     document.head.append(compassRemover)
   }
 
+  const restorePostProcessingSettings = () => {
+    if (!window.ppController) return
+
+    Object.assign(window.pp, {
+      hideCar: settings.noCar,
+      water: settings.water,
+      scramble: settings.scramble,
+      rescramble: settings.rescramble,
+      pixelate: settings.pixelate,
+      pixelScale: settings.pixelScale,
+      toon: settings.toon,
+      toonScale: settings.toonScale,
+      crt: settings.crt,
+      min: settings.min
+    })
+
+    try {
+      window.ppController.updateState(window.pp)
+    } catch {
+      // Older saved settings can contain multiple mutually exclusive filters.
+      for (const key of ['water', 'scramble', 'rescramble', 'pixelate', 'crt', 'min']) {
+        settings[key] = false
+        window.pp[key] = false
+      }
+      setLocalStorage('cg_ncnc__settings', settings)
+      window.ppController.updateState(window.pp)
+    }
+  }
+
+  restorePostProcessingSettings()
+
   window.toggleNoCarMode = (el) => {
     settings.noCar = el.checked
     setLocalStorage('cg_ncnc__settings', settings)

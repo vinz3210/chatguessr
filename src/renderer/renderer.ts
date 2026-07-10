@@ -3,8 +3,8 @@ import Vue3DraggableResizable from 'vue3-draggable-resizable'
 import Frame from './components/Frame.vue'
 import ModsControls from './components/Mods/Controls.vue'
 import './assets/styles.css'
-import './mods/noCarNoCompass'
 import './mods/extenssrPostProcessing'
+import './mods/noCarNoCompass'
 import './mods/extenssrMenuItemsPlugin'
 
 // MAIN FRAME

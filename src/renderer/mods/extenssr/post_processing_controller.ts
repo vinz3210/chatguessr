@@ -170,6 +170,7 @@ export default class PostProcessingController {
 	}
 	setHandler(handler: PostprocessHandler) {
 		this.handler = handler;
+		this.passShaderInfoAndUniforms();
 	}
 	assemblePasses() {
 		let passes: ShaderPass[] = [];
