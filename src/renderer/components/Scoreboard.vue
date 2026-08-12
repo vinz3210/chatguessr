@@ -102,11 +102,15 @@
         </thead>
         <tbody>
           <TransitionGroup name="scoreboard_rows">
-<tr v-for="(row, i) in rows" :key="row.player.username"
-    @mouseenter="highlightGuessMarkerByIndex(i)"
-    @mouseleave="resetGuessMarkerZIndexes()"
-    @click="onRowClick(row)"
-    :title="row.disqualifiedMessage ? row.disqualifiedMessage : ''">
+            <tr
+              v-for="(row, i) in rows"
+              :key="row.player.username"
+              :title="row.disqualifiedMessage ? row.disqualifiedMessage : ''"
+              @mouseenter="highlightGuessMarkerByIndex(i)"
+              @mouseleave="resetGuessMarkerZIndexes()"
+              @click="onRowClick(row)"
+              @contextmenu.prevent.stop="openPlayerMenu($event, row.player.username)"
+            >
               <td v-for="col in activeCols" :key="col.value">
                 <div
                   v-if="col.value === 'player'"
@@ -149,14 +153,48 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Teleported so the draggable wrapper's transform can't capture the
+         fixed positioning, and so the menu isn't clipped by the table. -->
+    <Teleport to="body">
+      <div
+        v-if="playerMenu"
+        ref="playerMenuEl"
+        class="cg-player-menu"
+        :style="{ left: `${playerMenu.x}px`, top: `${playerMenu.y}px` }"
+      >
+        <span class="cg-player-menu__title">{{ playerMenu.username }}</span>
+        <button type="button" class="cg-player-menu__item" @click="askToBan()">🚫 Ban user</button>
+      </div>
+
+      <Modal :is-visible="banCandidate !== null" @close="banCandidate = null">
+        <div class="ban-modal">
+          <h2>Ban user</h2>
+          <p>
+            Ban <strong>{{ banCandidate }}</strong> from playing?
+          </p>
+          <p class="ban-modal__note">
+            Their guesses are ignored from now on and they are left out of the stats.
+          </p>
+          <p class="ban-modal__note">
+            A guess they already made this round stays. Unban from Settings → Ban list.
+          </p>
+          <div class="flex gap-05 mt-1">
+            <button type="button" class="btn" @click="banCandidate = null">Cancel</button>
+            <button type="button" class="btn bg-danger" @click="confirmBan()">Ban</button>
+          </div>
+        </div>
+      </Modal>
+    </Teleport>
   </Vue3DraggableResizable>
 </template>
 
 <script setup lang="ts">
 import { shallowRef, shallowReactive, reactive, onMounted, onBeforeUnmount, toRef, watch, computed, nextTick } from 'vue'
-import { useIntervalFn } from '@vueuse/core'
+import { useIntervalFn, onClickOutside } from '@vueuse/core'
 import formatDuration from 'format-duration'
 import { getLocalStorage, setLocalStorage } from '@/useLocalStorage'
+import Modal from './ui/Modal.vue'
 import IconAutoScroll from '@/assets/icons/auto_scroll.svg'
 import IconGear from '@/assets/icons/gear.svg'
 import OceanPlonkIllegal from '@/assets/icons/oceanPlonkIllegal.svg'
@@ -591,6 +629,53 @@ function resetGuessMarkerZIndexes() {
   });
 }
 
+// -- Right-click a row to ban that player ------------------------------------
+
+const playerMenu = shallowRef<{ username: string; x: number; y: number } | null>(null)
+const playerMenuEl = shallowRef<HTMLElement | null>(null)
+const banCandidate = shallowRef<string | null>(null)
+
+const MENU_SIZE = { width: 170, height: 70 }
+
+function openPlayerMenu(event: MouseEvent, username: string) {
+  playerMenu.value = {
+    username,
+    // Keep the menu inside the viewport when right-clicking near an edge.
+    x: Math.min(event.clientX, window.innerWidth - MENU_SIZE.width),
+    y: Math.min(event.clientY, window.innerHeight - MENU_SIZE.height)
+  }
+}
+
+const closePlayerMenu = () => {
+  playerMenu.value = null
+}
+
+onClickOutside(playerMenuEl, closePlayerMenu)
+
+function onWindowKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closePlayerMenu()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onWindowKeydown)
+  window.addEventListener('blur', closePlayerMenu)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWindowKeydown)
+  window.removeEventListener('blur', closePlayerMenu)
+})
+
+function askToBan() {
+  banCandidate.value = playerMenu.value?.username ?? null
+  closePlayerMenu()
+}
+
+function confirmBan() {
+  if (banCandidate.value) chatguessrApi.addBannedUser(banCandidate.value)
+  banCandidate.value = null
+}
+
 defineExpose({
   onStartRound,
   renderGuess,
@@ -604,6 +689,86 @@ defineExpose({
 </script>
 
 <style scoped>
+.cg-player-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 150px;
+  padding: 0.25rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  color: #fff;
+  background-color: rgba(51, 51, 51, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgb(99, 99, 99);
+  border-radius: 5px;
+  box-shadow: 0 2px 8px #000c;
+  user-select: none;
+}
+
+.cg-player-menu__title {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cg-player-menu__item {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  color: #fff;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.cg-player-menu__item:hover {
+  background: var(--danger);
+}
+
+.ban-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  max-width: 24rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.ban-modal h2 {
+  margin: 0;
+  color: var(--danger);
+}
+
+.ban-modal p {
+  margin: 0;
+}
+
+.ban-modal__note {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.ban-modal .btn {
+  min-width: 5.5rem;
+  color: #fff;
+  background: rgb(90, 90, 90);
+}
+
+.ban-modal .btn.bg-danger {
+  color: #000;
+}
+
 .scoreboard {
   font-family: 'Montserrat', sans-serif;
   text-align: center;

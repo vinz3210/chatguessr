@@ -54,7 +54,9 @@ export default class GameHandler {
   #moveCommandTimeKeeper: { [key: string]: number } = {}
 
   #lastRoundSeed: string | undefined
-  
+
+  #nextRoundInFlight = false
+
   TMPZ: boolean
 
   constructor(
@@ -98,19 +100,31 @@ export default class GameHandler {
     this.#backend?.sendMessage(settings.messageGuessesAreClosed, { system: true })
   }
 
-  async nextRound(isRestartClick: boolean = false) {
-    this.#battleRoyaleCounter = {}
+  // #showGameResults() reads the DB and uploads a game summary, so it awaits for a
+  // while. Without the in-flight guard two calls landing close together post the
+  // results and upload the summary twice.
+  async nextRound() {
+    if (this.#nextRoundInFlight) return
+    this.#nextRoundInFlight = true
 
-    if (this.#game.isFinished) {
-      this.#game.finishGame()
-      let winner = await this.#showGameResults()
-      this.#game.setGameWinner(winner)
+    try {
+      this.#battleRoyaleCounter = {}
 
-    } else {
-      this.#win.webContents.send('next-round', this.#game.isMultiGuess, this.#game.getLocation())
-      if(settings.showRoundStarted && !isRestartClick)
-        this.#backend?.sendMessage(settings.messageRoundStarted.replace("<round>", this.#game.round.toString()), { system: true })
-      this.openGuesses()
+      if (this.#game.isFinished) {
+        this.#game.finishGame()
+        const winner = await this.#showGameResults()
+        this.#game.setGameWinner(winner)
+      } else {
+        this.#win.webContents.send('next-round', this.#game.isMultiGuess, this.#game.getLocation())
+        if (settings.showRoundStarted)
+          this.#backend?.sendMessage(
+            settings.messageRoundStarted.replace('<round>', this.#game.round.toString()),
+            { system: true }
+          )
+        this.openGuesses()
+      }
+    } finally {
+      this.#nextRoundInFlight = false
     }
   }
 
@@ -547,22 +561,33 @@ export default class GameHandler {
           }
         } 
 
+      // 'did-frame-finish-load' fires per frame, not per page load, so this runs
+      // many times while the round-results screen is up (changing the map type is
+      // enough to trigger it). Bind through stable handlers and remove before
+      // adding: a fresh anonymous listener each time would stack on the same
+      // button, and one click would then fire every copy at once — disabling the
+      // button mid-dispatch does not stop the remaining listeners.
       this.#win.webContents.executeJavaScript(`
+          window.__cgNextRoundHandler = window.__cgNextRoundHandler || function () {
+              window.nextRoundBtn.setAttribute('disabled', 'disabled');
+              chatguessrApi.startNextRound();
+          };
+          window.__cgPlayAgainHandler = window.__cgPlayAgainHandler || function () {
+              window.playAgainBtn.setAttribute('disabled', 'disabled');
+              chatguessrApi.returnToMapPage();
+          };
+
           window.nextRoundBtn = document.querySelector('[data-qa="close-round-result"]');
           window.playAgainBtn = document.querySelector('[data-qa="play-again-button"]');
 
           if (window.nextRoundBtn) {
-              nextRoundBtn.addEventListener("click", () => {
-                  nextRoundBtn.setAttribute('disabled', 'disabled');
-                  chatguessrApi.startNextRound(true);
-              });
+              nextRoundBtn.removeEventListener("click", window.__cgNextRoundHandler);
+              nextRoundBtn.addEventListener("click", window.__cgNextRoundHandler);
           }
 
           if (window.playAgainBtn) {
-              playAgainBtn.addEventListener("click", () => {
-                  playAgainBtn.setAttribute('disabled', 'disabled');
-                  chatguessrApi.returnToMapPage();
-              });
+              playAgainBtn.removeEventListener("click", window.__cgPlayAgainHandler);
+              playAgainBtn.addEventListener("click", window.__cgPlayAgainHandler);
           }
       `)
 

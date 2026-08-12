@@ -41,22 +41,44 @@ function isMapsPage() {
   return /^\/maps\/[^/]+\/?$/.test(window.location.pathname)
 }
 
+/**
+ * The mods panel reuses GeoGuessr's own class names so it inherits their
+ * styling — noCarNoCompass, blinkMode and satelliteMode all render a
+ * `start-standard-game_settings…` div inside `#mods-controls`. Those are also
+ * what we search for to place the panel, so a plain `document.querySelector`
+ * can hand back an element inside the panel itself. Appending the panel into
+ * its own descendant throws "The new child element contains the parent", which
+ * fires once per DOM mutation while GeoGuessr rebuilds the page.
+ */
+function isOurs(element: Element) {
+  return modsControls.contains(element) || floatingModsControlsHost.contains(element)
+}
+
+function queryOutsidePanel(selector: string, root: ParentNode = document): HTMLElement | null {
+  for (const element of root.querySelectorAll(selector)) {
+    if (element instanceof HTMLElement && !isOurs(element)) return element
+  }
+  return null
+}
+
 function getModsControlsTarget() {
-  const mapDetailPageMain = document.querySelector(
+  const mapDetailPageMain = queryOutsidePanel(
     '[class^="map-detail-page_main"], [class*=" map-detail-page_main"]'
   )
 
   if (mapDetailPageMain instanceof HTMLElement) {
-    const playBar = mapDetailPageMain.querySelector(
+    const playBar = queryOutsidePanel(
       [
         '[class^="play-bar_root"][class*="play-bar_desktopBar"]',
         '[class*=" play-bar_root"][class*="play-bar_desktopBar"]',
         '[class^="play-bar_root"]',
         '[class*=" play-bar_root"]'
-      ].join(', ')
+      ].join(', '),
+      mapDetailPageMain
     )
-    const leaderboard = mapDetailPageMain.querySelector(
-      '[class^="map-detail-leaderboard_root"], [class*=" map-detail-leaderboard_root"]'
+    const leaderboard = queryOutsidePanel(
+      '[class^="map-detail-leaderboard_root"], [class*=" map-detail-leaderboard_root"]',
+      mapDetailPageMain
     )
 
     if (playBar instanceof HTMLElement) {
@@ -71,14 +93,17 @@ function getModsControlsTarget() {
   }
 
   for (const selector of mapPageTargetSelectors) {
-    const target = document.querySelector(selector)
-    if (target instanceof HTMLElement) return { target }
+    const target = queryOutsidePanel(selector)
+    if (target) return { target }
   }
 
   return null
 }
 
 function appendToTarget(targetElement: HTMLElement, before?: HTMLElement, after?: HTMLElement) {
+  // Last line of defence: never append the panel into its own subtree.
+  if (modsControls.contains(targetElement)) return
+
   modsControls.setAttribute('data-cg-floating', 'false')
 
   if (before) {
@@ -93,7 +118,10 @@ function appendToTarget(targetElement: HTMLElement, before?: HTMLElement, after?
     return
   }
 
-  if (modsControls.parentElement === targetElement && targetElement.lastElementChild === modsControls) {
+  if (
+    modsControls.parentElement === targetElement &&
+    targetElement.lastElementChild === modsControls
+  ) {
     return
   }
   targetElement.appendChild(modsControls)
@@ -127,10 +155,30 @@ const appendModsControlsComponent = () => {
   appendToFloatingHost()
 }
 
-const observer = new MutationObserver(() => {
-  appendModsControlsComponent()
-})
+// Coalesce to one placement pass per frame. Leaving a game churns through
+// thousands of body mutations while GeoGuessr tears down and rebuilds the page;
+// running the (document-wide, multi-selector) placement sweep on every single
+// one of them starves the main thread and the page never gets to paint.
+let placementScheduled = false
+
+const scheduleModsControlsPlacement = () => {
+  if (placementScheduled) return
+  placementScheduled = true
+
+  requestAnimationFrame(() => {
+    placementScheduled = false
+    try {
+      appendModsControlsComponent()
+    } catch (err) {
+      // A placement failure must never escape into the observer callback and
+      // repeat on every mutation.
+      console.error('[chatguessr] failed to place mods controls', err)
+    }
+  })
+}
+
+const observer = new MutationObserver(scheduleModsControlsPlacement)
 observer.observe(document.body, { childList: true, subtree: true })
-window.addEventListener('popstate', appendModsControlsComponent)
-window.setInterval(appendModsControlsComponent, 1000)
-appendModsControlsComponent()
+window.addEventListener('popstate', scheduleModsControlsPlacement)
+window.setInterval(scheduleModsControlsPlacement, 1000)
+scheduleModsControlsPlacement()

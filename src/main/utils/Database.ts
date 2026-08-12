@@ -1332,11 +1332,16 @@ ORDER BY
   }
 
   addBannedUser(username: string) {
+    // No unique constraint on the table, so guard the insert ourselves.
+    // NOCASE matches how isUserBanned compares names.
     this.#db
       .prepare(
         `
           INSERT INTO banned_users (username)
-          VALUES (:username)
+          SELECT :username
+          WHERE NOT EXISTS (
+            SELECT 1 FROM banned_users WHERE username = :username COLLATE NOCASE
+          )
       `
       )
       .run({ username: username })

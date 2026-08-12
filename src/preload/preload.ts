@@ -19,7 +19,9 @@ whenDomReady().then(() => {
 
   const script = document.createElement('script')
   script.type = 'module'
-  script.innerHTML = rendererJS
+  // Without a sourceURL this shows up as an anonymous `VM<n>` script, so every
+  // stack trace from our own overlay is unreadable in DevTools.
+  script.innerHTML = `${rendererJS}\n//# sourceURL=chatguessr-renderer.js\n`
   document.body.appendChild(script)
 
   const css = document.createElement('style')
