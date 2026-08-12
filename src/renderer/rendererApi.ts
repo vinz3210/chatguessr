@@ -2,7 +2,6 @@ import { getLocalStorage, setLocalStorage } from './useLocalStorage'
 
 let globalMap: google.maps.Map | undefined = undefined
 const mapReady = hijackMap()
-removeGameReactions()
 setupMapStyleShortcuts()
 
 let guessMarkers: google.maps.marker.AdvancedMarkerElement[] = []
@@ -40,33 +39,8 @@ function setupMapStyleShortcuts() {
   })
 }
 
-function removeGameReactions() {
-  const selector = '[class^="game-reactions_root"]'
-  const remove = () => {
-    document.querySelectorAll(selector).forEach(el => el.remove())
-  }
-
-  // Initial removal
-  remove()
-
-  // Watch for changes
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (node instanceof HTMLElement) {
-          if (node.matches(selector) || node.querySelector(selector)) {
-            remove()
-          }
-        }
-      }
-    }
-  })
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  })
-}
+// The game reactions bar is hidden from override-gg-styles.css. Removing those
+// nodes from the DOM instead crashes React on unmount and blanks the page.
 
 async function loadMarkerLibrary() {
   return (await google.maps.importLibrary('marker')) as unknown as google.maps.MarkerLibrary

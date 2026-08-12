@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import SatelliteMode from './SatelliteMode.vue'
 import BlinkMode from './BlinkMode.vue'
+import UserscriptMenu from './UserscriptMenu.vue'
 </script>
 
 <template>
   <BlinkMode />
   <SatelliteMode />
+  <UserscriptMenu />
 </template>
 
 <style>

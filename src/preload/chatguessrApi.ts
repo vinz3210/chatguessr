@@ -67,6 +67,38 @@ export const chatguessrApi = {
     return ipcRenderer.invoke('import-audio-file')
   },
 
+  getUserscripts(): Promise<UserscriptInfo[]> {
+    return ipcRenderer.invoke('userscripts:list')
+  },
+
+  installUserscriptFromFile(): Promise<UserscriptInstallResult> {
+    return ipcRenderer.invoke('userscripts:install-from-file')
+  },
+
+  installUserscriptFromUrl(url: string): Promise<UserscriptInstallResult> {
+    return ipcRenderer.invoke('userscripts:install-from-url', url)
+  },
+
+  setUserscriptEnabled(id: string, enabled: boolean): Promise<boolean> {
+    return ipcRenderer.invoke('userscripts:set-enabled', id, enabled)
+  },
+
+  removeUserscript(id: string): Promise<boolean> {
+    return ipcRenderer.invoke('userscripts:remove', id)
+  },
+
+  updateUserscript(id: string): Promise<UserscriptUpdateResult> {
+    return ipcRenderer.invoke('userscripts:update', id)
+  },
+
+  getUserscriptSource(id: string): Promise<string | null> {
+    return ipcRenderer.invoke('userscripts:get-source', id)
+  },
+
+  openUserscriptsFolder(): Promise<string> {
+    return ipcRenderer.invoke('userscripts:open-folder')
+  },
+
   onGameStarted(
     callback: (
       isMultiGuess: boolean,

@@ -49,6 +49,14 @@
   display: none;
 }
 
+/* Hide the in-game reactions bar.
+   Must stay CSS-only: detaching these nodes leaves React's fiber tree pointing
+   at DOM that is no longer there, and the removeChild it runs on unmount throws,
+   which unmounts the whole React root and blanks the page. */
+[class^='game-reactions_root__'] {
+  display: none !important;
+}
+
 /* removes game breakdown button */
 [class^='standard-final-result_wrapper__'] > div:first-child {
   display: none;

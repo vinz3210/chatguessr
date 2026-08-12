@@ -623,6 +623,11 @@
       </div>
     </div>
 
+    <div v-show="currentTab === 'userscripts'" class="content">
+      <h2>Userscripts <small>(Tampermonkey compatible)</small></h2>
+      <Userscripts />
+    </div>
+
     <div v-show="currentTab === 'ban-list'" class="content">
       <div class="form__group">
         <div class="flex gap-03">
@@ -654,6 +659,7 @@
 import { shallowRef, shallowReactive, reactive, watch } from 'vue'
 import { useClipboard } from '@vueuse/core'
 import Tabs from './ui/Tabs.vue'
+import Userscripts from './Userscripts.vue'
 import IconTwitch from '@/assets/icons/twitch.svg'
 
 const { chatguessrApi } = window
@@ -679,7 +685,8 @@ const tabs = shallowRef([
 { name: 'mode-settings', value: 'Mode settings' },
   { name: 'twitch-connect', value: 'Twitch connect' },
   { name: 'ban-list', value: 'Ban list' },
-  { name: 'messages', value: 'Messages' }
+  { name: 'messages', value: 'Messages' },
+  { name: 'userscripts', value: 'Userscripts' }
 ])
 
 const settings = reactive<Settings>(await chatguessrApi.getSettings())

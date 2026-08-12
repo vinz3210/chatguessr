@@ -4,8 +4,12 @@ import { contextBridge } from 'electron'
 import { chatguessrApi } from './chatguessrApi'
 import whenDomReady from 'when-dom-ready'
 import useLoading from './useLoading'
+import useUserscripts from './userscripts'
 
 const { appendLoading, removeLoading } = useLoading()
+
+// Runs first so `@run-at document-start` scripts land before the page's own.
+useUserscripts()
 
 const rendererJS = fs.readFileSync(join(__dirname, 'renderer.js'), 'utf8')
 const rendererCSS = fs.readFileSync(join(__dirname, 'style.css'), 'utf8')

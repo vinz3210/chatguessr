@@ -40,6 +40,7 @@ This is a customized fork of ChatGuessr — an Electron app that injects a Vue 3
 - `src/main/utils/useSettings.ts` — all configurable settings with defaults
 - `src/main/utils/gameHelper.ts` — coordinate/scoring math utilities (well-tested)
 - `src/main/utils/Database.ts` — SQLite abstraction for player stats and game history
+- `src/main/lib/useScripts/` — Tampermonkey-compatible userscript support (metadata parsing, `@match` resolution, install/update, GM_* IPC handlers); paired with `src/preload/userscripts/`, which injects scripts and implements the GM API in the page's main world
 - `src/types.d.ts` — shared types: `Player`, `Location`, `RoundResult`, `GameResult`, etc.
 - `forge.config.ts` — Electron Forge + Vite build config (5 entry points: main, preload, renderer, auth_preload, auth_impl)
 

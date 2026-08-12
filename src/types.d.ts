@@ -236,3 +236,120 @@ type redeemCallbackFunctions = {
     callbacks: {},
   }
 }
+
+// Userscripts (Tampermonkey compatible)
+
+type UserscriptRunAt = 'document-start' | 'document-body' | 'document-end' | 'document-idle'
+
+type UserscriptResourceRef = { name: string; url: string }
+
+interface UserscriptMeta {
+  name: string
+  namespace: string
+  version: string
+  description: string
+  author: string
+  icon: string | null
+  homepage: string | null
+  supportUrl: string | null
+  downloadUrl: string | null
+  updateUrl: string | null
+  matches: string[]
+  includes: string[]
+  excludes: string[]
+  requires: string[]
+  resources: UserscriptResourceRef[]
+  connects: string[]
+  /** `null` means the script declared no @grant at all, so every API is provided. */
+  grants: string[] | null
+  runAt: UserscriptRunAt
+  noframes: boolean
+  metaStr: string
+}
+
+/** A downloaded @require or @resource, cached on disk next to the script. */
+interface UserscriptAssetEntry {
+  url: string
+  file: string
+  mimeType: string
+  error: string | null
+}
+
+interface UserscriptEntry {
+  id: string
+  enabled: boolean
+  origin: { type: 'file' | 'url'; url: string | null }
+  installedAt: number
+  updatedAt: number
+  meta: UserscriptMeta
+  requires: UserscriptAssetEntry[]
+  resources: (UserscriptAssetEntry & { name: string })[]
+}
+
+interface UserscriptInfo extends UserscriptEntry {
+  /** Assets that failed to download, surfaced in the settings UI. */
+  assetErrors: string[]
+}
+
+interface UserscriptResourcePayload {
+  url: string
+  mimeType: string
+  text: string | null
+  dataUrl: string
+}
+
+interface UserscriptPayload {
+  id: string
+  name: string
+  version: string
+  runAt: UserscriptRunAt
+  noframes: boolean
+  grants: string[] | null
+  code: string
+  requires: string[]
+  values: Record<string, string>
+  resources: Record<string, UserscriptResourcePayload>
+  info: Record<string, unknown>
+}
+
+interface UserscriptInstallResult {
+  ok: boolean
+  script?: UserscriptInfo
+  error?: string
+}
+
+interface UserscriptUpdateResult {
+  ok: boolean
+  updated: boolean
+  version?: string
+  error?: string
+}
+
+type GmXhrRequest = {
+  method?: string
+  url: string
+  headers?: Record<string, string>
+  data?: string | null
+  /** Binary request body, base64 encoded — contextBridge only moves strings reliably. */
+  dataBase64?: string | null
+  responseType?: 'text' | 'json' | 'arraybuffer' | 'blob' | 'document' | ''
+  timeout?: number
+  anonymous?: boolean
+  redirect?: 'follow' | 'error' | 'manual'
+  user?: string
+  password?: string
+}
+
+type GmXhrEvent =
+  | { type: 'progress'; loaded: number; total: number; lengthComputable: boolean }
+  | {
+      type: 'load'
+      status: number
+      statusText: string
+      finalUrl: string
+      responseHeaders: string
+      bodyBase64: string
+    }
+  | { type: 'error'; error: string }
+  | { type: 'timeout' }
+  | { type: 'abort' }
