@@ -8,6 +8,7 @@ import {
   getStreakCode,
   haversineDistance,
   calculateScore,
+  getAxisDistances,
   isCoordsInLand
 } from './utils/gameHelper'
 
@@ -320,12 +321,13 @@ export default class Game {
     }
 
     const distance = haversineDistance(location, this.location!)
+    const axisDistances = getAxisDistances(location, this.location!)
     let modifierMinusPointsIfWrongCountry = this.#settings.modifierMinusPointsIfWrongCountry
 
     let subtractedBRPoints = 0
     let numberofGamesInRoundFromRoundId = this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!)
     console.log("numberofGamesInRoundFromRoundId", numberofGamesInRoundFromRoundId)
-    var score = streamerGuess.timedOut ? 0 : calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier)
+    var score = streamerGuess.timedOut ? 0 : calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier, this.#settings.scoringMode, axisDistances)
     if(numberofGamesInRoundFromRoundId !== 1 && this.isGameOfChickenModeActivated){
       const didUserWinLastRound = this.#db.didUserWinLastRound('BROADCASTER', this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)
       if(didUserWinLastRound){
@@ -384,6 +386,7 @@ export default class Game {
     }
 
     const distance = haversineDistance(location, this.location!)
+    const axisDistances = getAxisDistances(location, this.location!)
     const modifierMinusPointsIfWrongCountry = this.#settings.modifierMinusPointsIfWrongCountry
     let subtractedBRPoints = 0
     if(this.#settings.isBRMode){
@@ -395,7 +398,7 @@ export default class Game {
     
     let numberofGamesInRoundFromRoundId = this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!)
     console.log("numberofGamesInRoundFromRoundId", numberofGamesInRoundFromRoundId)
-    var score = calculateScore(distance, this.mapScale! ,await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier)
+    var score = calculateScore(distance, this.mapScale! ,await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier, this.#settings.scoringMode, axisDistances) // player guess
     if(this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!) !== 1 && this.isGameOfChickenModeActivated){
 
       const didUserWinLastRound = this.#db.didUserWinLastRound(dbUser.id, this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)

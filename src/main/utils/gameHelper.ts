@@ -167,23 +167,75 @@ function modifyScore(score: number, modifier: number, allowMinus: boolean, round
   return score
 }
 
-export function calculateScore(distance: number, scale: number, isCorrectCountry: boolean, isClosestInWrongCountryModeActivated: boolean,  waterPlonkMode: string, isPlonkOnLand: boolean, invertScores: boolean, modifierMinusPointsIfWrongCountry: number, isBRMode: boolean, battleRoyaleSubtractedPoints: number, allowMinus: boolean,  maxErrorDistance?:number, roundNumber?:number, roundMultis?:string, randomRoundMultiplier?:number): number {
+/**
+ * Returns the axis-only distance in km between a guess and the target location.
+ *
+ * When only one axis (latitude or longitude) is used for scoring, the other axis
+ * is ignored entirely. For longitude, the degree->km conversion is corrected by
+ * cos(latitude), otherwise the same degree offset would count wildly differently
+ * near the poles vs. the equator.
+ */
+export function getAxisDistances(guess: LatLng, target: LatLng): { lat: number; lng: number } {
+  const latDeg = Math.abs(guess.lat - target.lat)
+  const latKm = latDeg * 111.32
+
+  // Longitude degree length depends on latitude: 111.32 * cos(lat) km per degree
+  const lngDeg = Math.abs(guess.lng - target.lng)
+  const midLatRad = ((guess.lat + target.lat) / 2) * (Math.PI / 180)
+  const lngKm = lngDeg * 111.32 * Math.cos(midLatRad)
+
+  return { lat: latKm, lng: lngKm }
+}
+
+export function calculateScore(distance: number, scale: number, isCorrectCountry: boolean, isClosestInWrongCountryModeActivated: boolean,  waterPlonkMode: string, isPlonkOnLand: boolean, invertScores: boolean, modifierMinusPointsIfWrongCountry: number, isBRMode: boolean, battleRoyaleSubtractedPoints: number, allowMinus: boolean,  maxErrorDistance?: number, roundNumber?: number, roundMultis?: string, randomRoundMultiplier?: number, scoringMode?: string, axisDistances?: { lat: number; lng: number }): number {
   let modifier = 0
   if (!isCorrectCountry) modifier = - modifierMinusPointsIfWrongCountry
   if(isBRMode && true)// battleRoyaleSubtractedPoints > 0)
     modifier = modifier - battleRoyaleSubtractedPoints
 
-  if (!maxErrorDistance) {
-    const score = 5000 * Math.pow(0.99866017, (distance * 1000) / scale)
+  /**
+   * Resolve the effective raw score (0..5000) for the selected scoring mode.
+   * - "off" (or undefined): normal haversine distance.
+   * - "latitude": only the latitude difference counts.
+   * - "longitude": only the longitude difference counts.
+   * - "latlng": both axes each contribute up to 2500 (via the same per-axis
+   *   curve), so the total can still reach 5000.
+   */
+  const axisCurve = (axd: number): number =>
+    maxErrorDistance
+      ? Math.round(5000 * Math.exp(-10 * ((axd * 1000) / maxErrorDistance)))
+      : 5000 * Math.pow(0.99866017, (axd * 1000) / scale)
 
-    return modifyScore(score, modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
+  const scoringRawScore = (): number => {
+    if (scoringMode === 'latitude') return axisCurve(axisDistances?.lat ?? distance)
+    if (scoringMode === 'longitude') return axisCurve(axisDistances?.lng ?? distance)
+    if (scoringMode === 'latlng') {
+      // Each axis contributes at most half (5000/2 = 2500), total capped at 5000.
+      const latScore = axisCurve(axisDistances?.lat ?? 0)
+      const lngScore = axisCurve(axisDistances?.lng ?? 0)
+      return Math.round(0.5 * latScore + 0.5 * lngScore)
+    }
+    return axisCurve(distance)
   }
-  const score = Math.round(5000 * Math.exp(-10 * ((distance * 1000) / maxErrorDistance)))
-  
+
+  // Without maxErrorDistance the original code returned immediately with the
+  // plain score (no wrong-country / ocean / invert handling). Preserve that,
+  // only the effective raw score changes with the selected scoring mode.
+  if (!maxErrorDistance) {
+    return modifyScore(
+      scoringRawScore(),
+      modifier,
+      allowMinus,
+      roundNumber,
+      roundMultis,
+      randomRoundMultiplier
+    )
+  }
 
   if (isCorrectCountry && isClosestInWrongCountryModeActivated) return 0
   if (waterPlonkMode == "illegal" && !isPlonkOnLand) return 0
   if (waterPlonkMode == "mandatory" && isPlonkOnLand) return 0
+  const score = scoringRawScore()
   if (!invertScores){
     return modifyScore(score ,modifier, allowMinus, roundNumber, roundMultis, randomRoundMultiplier)
   }

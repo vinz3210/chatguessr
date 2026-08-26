@@ -77,6 +77,7 @@ const defaultSettings = {
   allowMinus: false,
   roundMultis: "off",
   showRandomMultisOnlyAtEndOfRound: false,
+  scoringMode: "off",
   rotationDuration: 15,
   autorotateAtStart: false,
 }

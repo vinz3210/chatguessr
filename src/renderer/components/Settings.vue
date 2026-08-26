@@ -350,6 +350,29 @@
     </label>
 
     <hr />
+    <div>
+      <h2>Scoring Mode</h2>
+      <div class="ml-05">
+        <label class="form__group" data-tip="Off - normal GeoGuessr scoring">
+          Off
+          <input type="radio" v-model="settings.scoringMode" value="off" />
+        </label>
+        <label class="form__group" data-tip="Score only based on the latitude difference. If the target is in the Philippines and you click Colombia, you still score points because the latitude matches">
+          Latitude
+          <input type="radio" v-model="settings.scoringMode" value="latitude" />
+        </label>
+        <label class="form__group" data-tip="Score only based on the longitude difference">
+          Longitude
+          <input type="radio" v-model="settings.scoringMode" value="longitude" />
+        </label>
+        <label class="form__group" data-tip="Score based on both axes. Latitude and Longitude each contribute up to 2500 points with the normal curve, total capped at 5000">
+          Lat/Lng
+          <input type="radio" v-model="settings.scoringMode" value="latlng" />
+        </label>
+      </div>
+    </div>
+
+    <hr />
     <div class="grid-col">
       <div>
         <h2>Countdown /-up / ABC / Alphabet Settings</h2>
@@ -736,6 +759,7 @@ const resetModeSettings = () => {
   settings.allowMinus = false
   settings.roundMultis = "off"
   settings.showRandomMultisOnlyAtEndOfRound = false
+  settings.scoringMode = "off"
   settings.isGameOfChickenModeActivated = false
   settings.chickenModeSurvivesWith5k = false
   settings.chickenMode5kGivesPoints = false
