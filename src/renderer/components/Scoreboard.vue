@@ -106,7 +106,7 @@
               v-for="(row, i) in rows"
               :key="row.player.username"
               :title="row.disqualifiedMessage ? row.disqualifiedMessage : ''"
-              @mouseenter="highlightGuessMarkerByIndex(i)"
+              @mouseenter="highlightGuessMarker(row, i)"
               @mouseleave="resetGuessMarkerZIndexes()"
               @click="onRowClick(row)"
               @contextmenu.prevent.stop="openPlayerMenu($event, row.player.username)"
@@ -597,36 +597,29 @@ function toMeter(distance: number) {
 }
 
 function highlightGuessMarkerByIndex(index: number) {
-  // Find all guess markers
-  console.log('highlightGuessMarkerByIndex', index);
-  const markers = document.querySelectorAll('.custom-guess-marker');
-  var markerParents: (HTMLElement | null | undefined)[] = []
-  markers.forEach((el) => {
-    const parent = (el as HTMLElement)?.closest('[class*="marker-view"]');
-    if (parent) markerParents.push(parent as HTMLElement);
-  });
-  // reverse markerParents
-  markerParents.reverse();
-  markerParents.forEach((el, i) => {
-    if (i === index) {
-      //(el as HTMLElement).style.position = 'relative';
-      (el as HTMLElement).style.zIndex = '9999';
-    } else {
-      //(el as HTMLElement).style.position = '';
-      (el as HTMLElement).style.zIndex = '';
-    }
-  });
+  const markers = document.querySelectorAll<HTMLElement>('.custom-guess-marker[data-result-index]')
+  markers.forEach((marker) => {
+    const parent = marker.closest<HTMLElement>(
+      '[data-chatguessr-globe-marker], [class*="marker-view"]'
+    )
+    if (!parent) return
+    parent.style.zIndex = Number(marker.dataset.resultIndex) === index ? '9999' : ''
+  })
+}
+
+function highlightGuessMarker(row: ScoreboardRow, fallbackIndex: number) {
+  if (props.gameState !== 'round-results') return
+  highlightGuessMarkerByIndex(row.index ? row.index.value - 1 : fallbackIndex)
 }
 
 function resetGuessMarkerZIndexes() {
-  const markers = document.querySelectorAll('.custom-guess-marker');
-  markers.forEach((el) => {
-    const parent = (el as HTMLElement)?.parentElement?.parentElement;
-    if (parent) {
-      parent.style.position = '';
-      parent.style.zIndex = '';
-    }
-  });
+  const markers = document.querySelectorAll<HTMLElement>('.custom-guess-marker')
+  markers.forEach((marker) => {
+    const parent = marker.closest<HTMLElement>(
+      '[data-chatguessr-globe-marker], [class*="marker-view"]'
+    )
+    if (parent) parent.style.zIndex = ''
+  })
 }
 
 // -- Right-click a row to ban that player ------------------------------------

@@ -1,4 +1,5 @@
 import { getLocalStorage, setLocalStorage } from './useLocalStorage'
+import { globeResultsOverlay, type GlobeResultOverlayItem } from './globeResultsOverlay'
 
 let globalMap: google.maps.Map | undefined = undefined
 const mapReady = hijackMap()
@@ -6,6 +7,10 @@ setupMapStyleShortcuts()
 
 let guessMarkers: google.maps.marker.AdvancedMarkerElement[] = []
 let polylines: google.maps.Polyline[] = []
+let markerDrawRevision = 0
+// SVG great-circle paths need to be reprojected while the globe rotates. Keep
+// unusually large lobbies responsive; every avatar is still shown.
+const globePolylineLimit = 50
 
 let satelliteLayer: google.maps.Map | undefined = undefined
 let satelliteMarker: google.maps.marker.AdvancedMarkerElement | undefined = undefined
@@ -51,8 +56,31 @@ async function drawRoundResults(
   roundResults: RoundResult[],
   limit: number = 100
 ) {
+  const globeItems: GlobeResultOverlayItem[] = []
+  for (let i = roundResults.length - 1; i >= 0; i--) {
+    const result = roundResults[i]
+    if (i >= limit) continue
+
+    globeItems.push({
+      position: result.position,
+      createMarker: () => createCustomGuessMarker(result.player.avatar, i),
+      createTooltip: () =>
+        createGlobeResultTooltip({
+          player: result.player,
+          score: result.score,
+          distance: result.distance,
+          streakCode: result.streakCode
+        }),
+      ...(i < globePolylineLimit
+        ? { lineTo: location, lineColor: result.player.color }
+        : {})
+    })
+  }
+  const revision = beginResultDraw(globeItems)
+
   await mapReady
   const { AdvancedMarkerElement } = await loadMarkerLibrary()
+  if (revision !== markerDrawRevision) return
 
   const map = globalMap
 
@@ -100,12 +128,30 @@ async function drawRoundResults(
 }
 
 async function drawPlayerResults(locations: Location_[], result: GameResultDisplay) {
+  const globeItems: GlobeResultOverlayItem[] = []
+  result.guesses.forEach((guess, index) => {
+    if (!guess) return
+
+    globeItems.push({
+      position: guess,
+      lineTo: locations[index],
+      lineColor: result.player.color,
+      createMarker: () => createCustomGuessMarker(result.player.avatar),
+      createTooltip: () =>
+        createGlobeResultTooltip({
+          player: result.player,
+          score: result.scores[index],
+          distance: result.distances[index]
+        })
+    })
+  })
+  const revision = beginResultDraw(globeItems)
+
   await mapReady
   const { AdvancedMarkerElement } = await loadMarkerLibrary()
+  if (revision !== markerDrawRevision) return
 
   const map = globalMap
-
-  clearMarkers()
 
   const infoWindow = createInfoWindow()
 
@@ -147,9 +193,68 @@ async function drawPlayerResults(locations: Location_[], result: GameResultDispl
 }
 
 function focusOnGuess(location: LatLng) {
+  if (globeResultsOverlay.focus(location)) return
   if (!globalMap) return
   globalMap.setCenter(location)
   globalMap.setZoom(8)
+}
+
+function beginResultDraw(items: GlobeResultOverlayItem[]) {
+  clearMarkers()
+  globeResultsOverlay.setItems(items)
+  return markerDrawRevision
+}
+
+type GlobeResultTooltipDetails = {
+  player: Player
+  score: number | null | undefined
+  distance: number | null | undefined
+  streakCode?: string | null
+}
+
+function createGlobeResultTooltip(details: GlobeResultTooltipDetails) {
+  const tooltip = document.createElement('div')
+  tooltip.className = 'cg-globe-marker-tooltip'
+  tooltip.setAttribute('role', 'tooltip')
+
+  const playerLine = document.createElement('div')
+  playerLine.className = 'cg-globe-marker-tooltip--player'
+  if (details.player.flag) playerLine.appendChild(createFlagIcon(details.player.flag))
+
+  const username = document.createElement('span')
+  username.className = 'username'
+  username.style.color = details.player.color
+  username.textContent = details.player.username
+  playerLine.appendChild(username)
+  tooltip.appendChild(playerLine)
+
+  if (details.score !== null && details.score !== undefined) {
+    const score = document.createElement('div')
+    score.textContent = `${details.score}`
+    tooltip.appendChild(score)
+  }
+
+  if (details.distance !== null && details.distance !== undefined) {
+    const distance = document.createElement('div')
+    distance.textContent = parseDistance(details.distance)
+    tooltip.appendChild(distance)
+  }
+
+  if (details.streakCode) {
+    const streak = document.createElement('div')
+    streak.className = 'cg-globe-marker-tooltip--streak'
+    streak.append(createFlagIcon(details.streakCode), document.createTextNode(details.streakCode))
+    tooltip.appendChild(streak)
+  }
+
+  return tooltip
+}
+
+function createFlagIcon(code: string) {
+  const flag = document.createElement('span')
+  flag.className = 'flag-icon'
+  flag.style.backgroundImage = `url("flag:${code}")`
+  return flag
 }
 
 function createInfoWindow() {
@@ -168,6 +273,7 @@ function createCustomGuessMarker(avatar: string | null, index?: number) {
   markerEl.appendChild(avatarImg)
 
   if (index !== undefined) {
+    markerEl.dataset.resultIndex = `${index}`
     const labelText = document.createElement('span')
     labelText.textContent = `${index + 1}`
 
@@ -182,6 +288,7 @@ function createCustomGuessMarker(avatar: string | null, index?: number) {
 }
 
 function clearMarkers() {
+  markerDrawRevision += 1
   for (const marker of guessMarkers) {
     marker.map = null
   }
@@ -190,6 +297,7 @@ function clearMarkers() {
   }
   guessMarkers = []
   polylines = []
+  globeResultsOverlay.clear()
 }
 
 async function showSatelliteMap(location: LatLng) {

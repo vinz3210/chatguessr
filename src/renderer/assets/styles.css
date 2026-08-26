@@ -339,6 +339,63 @@ textarea:focus {
   font-weight: bold;
 }
 
+/* Result markers projected by the optional GeoGuessr Globe userscript bridge. */
+[data-chatguessr-globe-marker] .custom-guess-marker {
+  top: 0;
+}
+
+[data-chatguessr-globe-marker] .custom-guess-marker--label {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 2px;
+  place-items: center;
+  line-height: 16px;
+}
+
+.cg-globe-marker-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(50% + 22px);
+  z-index: 2;
+  min-width: max-content;
+  max-width: 220px;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 8px;
+  transform: translateX(-50%);
+  transition: opacity 100ms ease-out;
+}
+
+[data-chatguessr-globe-marker]:hover .cg-globe-marker-tooltip,
+[data-chatguessr-globe-marker]:focus-within .cg-globe-marker-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.cg-globe-marker-tooltip--player,
+.cg-globe-marker-tooltip--streak {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.cg-globe-marker-tooltip .username {
+  max-width: 190px;
+}
+
 .username,
 .gm-style-iw-d .username {
   padding: 2px;
