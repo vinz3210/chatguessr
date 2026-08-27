@@ -8,6 +8,7 @@
           :is-multi-guess
           :is-b-r-mode
           :mode-help
+          :scoring-mode
           :on-round-result-row-click
           :on-game-result-row-click
         />
@@ -140,6 +141,7 @@ const gameState = shallowRef<GameState>('none')
 const isMultiGuess = shallowRef<boolean>(false)
 const isBRMode = shallowRef<boolean>(false)
 const modeHelp = shallowRef<string[]>([])
+const scoringMode = shallowRef<ScoringMode>('off')
 const guessMarkersLimit = shallowRef<number | null>(null)
 const currentLocation = shallowRef<LatLng | null>(null)
 const gameResultLocations = shallowRef<Location_[] | null>(null)
@@ -249,7 +251,7 @@ async function showRandomMultiMessageInScoreboard(){
 }
 
 onBeforeUnmount(
-  chatguessrApi.onGameStarted(async(_isMultiGuess, _isBRMode, _modeHelp, restoredGuesses, location) => {
+  chatguessrApi.onGameStarted(async(_isMultiGuess, _isBRMode, _modeHelp, restoredGuesses, location, _scoringMode) => {
     
 
     isMultiGuess.value = _isMultiGuess
@@ -259,6 +261,7 @@ onBeforeUnmount(
     console.log("isBRMode", isBRMode.value)
     
     modeHelp.value = _modeHelp
+    scoringMode.value = _scoringMode ?? 'off'
     gameState.value = 'in-round'
     
 
@@ -285,9 +288,10 @@ onBeforeUnmount(
 )
 
 onBeforeUnmount(
-  chatguessrApi.onRoundStarted(async(_modeHelp) => {
+  chatguessrApi.onRoundStarted(async(_modeHelp, _scoringMode) => {
     gameState.value = 'in-round'
     modeHelp.value = _modeHelp
+    scoringMode.value = _scoringMode ?? 'off'
     }
   )
 )

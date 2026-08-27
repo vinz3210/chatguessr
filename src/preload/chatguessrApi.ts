@@ -105,7 +105,8 @@ export const chatguessrApi = {
       isBRMode: boolean,
       modeHelp: string[],
       restoredGuesses: RoundResult[] | Player[],
-      location: Location_
+      location: Location_,
+      scoringMode: ScoringMode
     ) => void
   ) {
     return ipcRendererOn('game-started', callback)
@@ -113,6 +114,7 @@ export const chatguessrApi = {
   onRoundStarted(
     callback: (
       modeHelp: string[],
+      scoringMode: ScoringMode
     ) => void
   ) {
     return ipcRendererOn('round-started', callback)

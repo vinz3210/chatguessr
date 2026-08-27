@@ -27,27 +27,43 @@
             :disabled="isMultiGuess && !props.isBRMode"
             @click="settings.streak = !settings.streak"
           >
-            {{ round_columns[2].name }}
+            {{ colName('streak') }}
           </button>
           <button
             :class="['btn', { active: settings.distance }]"
             :disabled="isMultiGuess && !props.isBRMode"
             @click="settings.distance = !settings.distance"
           >
-            {{ round_columns[3].name }}
+            {{ colName('distance') }}
+          </button>
+          <button
+            v-if="isAxisColumnAvailable('latDistance')"
+            :class="['btn', { active: settings.latDistance }]"
+            :disabled="isMultiGuess && !props.isBRMode"
+            @click="settings.latDistance = !settings.latDistance"
+          >
+            {{ colName('latDistance') }}
+          </button>
+          <button
+            v-if="isAxisColumnAvailable('lngDistance')"
+            :class="['btn', { active: settings.lngDistance }]"
+            :disabled="isMultiGuess && !props.isBRMode"
+            @click="settings.lngDistance = !settings.lngDistance"
+          >
+            {{ colName('lngDistance') }}
           </button>
           <button
             :class="['btn', { active: settings.score }]"
             :disabled="isMultiGuess && !props.isBRMode"
             @click="settings.score = !settings.score"
           >
-            {{ round_columns[4].name }}
+            {{ colName('score') }}
           </button>
           <button
             :class="['btn', { active: settings.totalScore }]"
             @click="settings.totalScore = !settings.totalScore"
           >
-            {{ round_columns[5].name }}
+            {{ colName('totalScore') }}
           </button>
         </div>
       </div>
@@ -206,6 +222,7 @@ const props = defineProps<{
   isMultiGuess: boolean
   isBRMode: boolean
   modeHelp: string[]
+  scoringMode: ScoringMode
   onRoundResultRowClick: (index: number, position: LatLng) => void
   onGameResultRowClick: (row: GameResultDisplay) => void
 }>()
@@ -232,16 +249,23 @@ onBeforeUnmount(() => {
   console.log("Scoreboard: beforeUnmount")
 })
 
-const settings = reactive(
-  getLocalStorage('cg_scoreboard__settings', {
-    autoScroll: false,
-    scrollSpeed: 15,
-    streak: true,
-    distance: true,
-    score: true,
-    totalScore: true
-  })
-)
+const defaultScoreboardSettings = {
+  autoScroll: false,
+  scrollSpeed: 15,
+  streak: true,
+  distance: true,
+  latDistance: true,
+  lngDistance: true,
+  score: true,
+  totalScore: true
+}
+
+// Spread over the defaults so keys added in later versions exist for users who
+// already have a stored settings object.
+const settings = reactive({
+  ...defaultScoreboardSettings,
+  ...getLocalStorage('cg_scoreboard__settings', defaultScoreboardSettings)
+})
 watch(settings, () => {
   setLocalStorage('cg_scoreboard__settings', settings)
 })
@@ -285,6 +309,8 @@ const round_columns: Column[] = [
   { name: 'Player', value: 'player', width: '100%', sortable: false },
   { name: 'Streak', value: 'streak', width: '48px', sortable: true },
   { name: 'Distance', value: 'distance', width: '80px', sortable: true },
+  { name: 'Lat', value: 'latDistance', width: '70px', sortable: true },
+  { name: 'Lng', value: 'lngDistance', width: '70px', sortable: true },
   { name: 'Score', value: 'score', width: '65px', sortable: true },
   { name: 'Total', value: 'totalScore', width: '65px', sortable: true }
 ]
@@ -293,27 +319,54 @@ const end_columns: Column[] = [
   { name: 'Player', value: 'player', width: '100%', sortable: false },
   { name: 'Streak', value: 'streak', width: '48px', sortable: true },
   { name: 'Distance', value: 'distance', width: '80px', sortable: true },
+  { name: 'Lat', value: 'latDistance', width: '70px', sortable: true },
+  { name: 'Lng', value: 'lngDistance', width: '70px', sortable: true },
   { name: 'Score', value: 'score', width: '65px', sortable: true }
 ]
+
+const playerColumn = round_columns.find((col) => col.value === 'player')!
+
+function colName(value: string) {
+  return round_columns.find((col) => col.value === value)!.name
+}
+
+/**
+ * The per-axis distance columns only carry meaning for the scoring mode that
+ * actually scores on that axis, so they stay hidden for the others.
+ */
+function isAxisColumnAvailable(value: string) {
+  if (value === 'latDistance')
+    return props.scoringMode === 'latitude' || props.scoringMode === 'latlng'
+  if (value === 'lngDistance')
+    return props.scoringMode === 'longitude' || props.scoringMode === 'latlng'
+  return true
+}
+
+/** Axis columns are additionally toggleable from the gear menu. */
+function isAxisColumnVisible(value: string) {
+  if (value !== 'latDistance' && value !== 'lngDistance') return true
+  return isAxisColumnAvailable(value) && settings[value] === true
+}
+
 const activeRoundCols = computed(() =>
   props.gameState === 'in-round'
     ? (props.isMultiGuess && !props.isBRMode)
-      ? [round_columns[1]]
+      ? [playerColumn]
       : round_columns.filter(
-          (f) => f.value === 'index' || f.value === 'player' || ( settings[f.value] === true && f.value !== 'totalScore' )
+          (f) => f.value === 'index' || f.value === 'player' || ( isAxisColumnVisible(f.value) && settings[f.value] === true && f.value !== 'totalScore' )
         )
     : round_columns.filter(
-          (f) => f.value !== 'totalScore' || settings['totalScore'] === true
+          (f) => isAxisColumnVisible(f.value) && (f.value !== 'totalScore' || settings['totalScore'] === true)
         )
 )
 const activeEndCols = computed(() =>
   props.gameState === 'in-round'
     ? (props.isMultiGuess && !props.isBRMode)
-      ? [end_columns[1]]
+      ? [playerColumn]
       : end_columns.filter(
-          (f) => f.value === 'index' || f.value === 'player' || settings[f.value] === true
+          (f) => f.value === 'index' || f.value === 'player' || ( isAxisColumnVisible(f.value) && settings[f.value] === true )
         )
-    : end_columns
+    : end_columns.filter((f) => isAxisColumnVisible(f.value))
 )
 const activeCols = computed(() =>
   props.gameState === 'game-results' ? activeEndCols.value : activeRoundCols.value
@@ -336,6 +389,8 @@ function renderGuess(guess: Guess) {
       display: guess.lastStreak ? guess.streak + ` [` + guess.lastStreak + `]` : guess.streak
     },
     distance: { value: guess.distance, display: toMeter(guess.distance) },
+    latDistance: axisCell(guess.latDistance),
+    lngDistance: axisCell(guess.lngDistance),
     score: { value: guess.score, display: guess.score },
     isRandomPlonk: guess.isRandomPlonk,
     modified: guess.modified,
@@ -359,6 +414,8 @@ function renderMultiGuess(guess: Guess) {
     isRandomPlonk: guess.isRandomPlonk,
     streak: { value: 0, display: '' },
     distance: { value: 0, display: '' },
+    latDistance: { value: 0, display: '' },
+    lngDistance: { value: 0, display: '' },
     score: { value: 0, display: '' }
   }
 
@@ -373,6 +430,8 @@ function renderMultiGuess(guess: Guess) {
         display: guess.lastStreak ? `${guess.streak} [${guess.lastStreak}]` : `${guess.streak}`
       },
       distance: { value: guess.distance, display: toMeter(guess.distance) },
+      latDistance: axisCell(guess.latDistance),
+      lngDistance: axisCell(guess.lngDistance),
       score: { value: guess.score, display: `${guess.score}` },
       isRandomPlonk: guess.isRandomPlonk,
       brCounter: guess.brCounter
@@ -418,6 +477,8 @@ function restoreGuesses(restoredGuesses: RoundResult[]) {
         display: guess.lastStreak ? guess.streak + ` [` + guess.lastStreak + `]` : guess.streak
       },
       distance: { value: guess.distance, display: toMeter(guess.distance) },
+      latDistance: axisCell(guess.latDistance),
+      lngDistance: axisCell(guess.lngDistance),
       score: { value: guess.score, display: guess.score },
       isRandomPlonk: guess.isRandomPlonk
     }
@@ -452,6 +513,8 @@ function showRoundResults(round: number, roundResults: RoundResult[]) {
             ? toMeter(result.distance) + ` [` + formatDuration(result.time * 1000) + `]`
             : toMeter(result.distance)
       },
+      latDistance: axisCell(result.latDistance),
+      lngDistance: axisCell(result.lngDistance),
       score: {
         value: result.score,
         display: result.score
@@ -487,6 +550,8 @@ function showGameResults(gameResults: GameResult[]) {
         value: result.totalDistance,
         display: toMeter(result.totalDistance)
       },
+      latDistance: axisCell(result.totalLatDistance),
+      lngDistance: axisCell(result.totalLngDistance),
       score: {
         value: result.totalScore,
         display: `${result.totalScore} [${result.guesses.filter(Boolean).length}]`
@@ -594,6 +659,17 @@ function setSwitchState(state: boolean) {
 
 function toMeter(distance: number) {
   return distance >= 1 ? distance.toFixed(1) + 'km' : Math.floor(distance * 1000) + 'm'
+}
+
+/**
+ * Cell for a per-axis distance. Older guesses (restored from a game started
+ * before this ran) carry no axis distance, so those render empty rather than
+ * claiming a 0km miss.
+ */
+function axisCell(distance?: number) {
+  return distance == null
+    ? { value: Number.POSITIVE_INFINITY, display: '' }
+    : { value: distance, display: toMeter(distance) }
 }
 
 function highlightGuessMarkerByIndex(index: number) {
@@ -842,6 +918,10 @@ defineExpose({
 .column-visibility {
   position: absolute;
   display: flex;
+  /* The axis distance columns add up to two more toggles, so wrap instead of
+     letting the popup run off the side of the scoreboard. */
+  flex-wrap: wrap;
+  max-width: 275px;
   gap: 0.19rem;
   margin-top: -7px;
   left: 75px;

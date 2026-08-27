@@ -30,6 +30,10 @@ interface Guess {
   streak: number
   lastStreak: number | null
   distance: number
+  /** Latitude-only distance in km, shown when a lat/lng scoring mode is active. */
+  latDistance?: number
+  /** Longitude-only distance in km, shown when a lat/lng scoring mode is active. */
+  lngDistance?: number
   score: number
   modified?: boolean
   isRandomPlonk?: boolean
@@ -42,6 +46,8 @@ interface RoundResult {
   streak: number
   lastStreak: number | null
   distance: number
+  latDistance?: number
+  lngDistance?: number
   score: number
   totalScore: number
   isRandomPlonk: boolean
@@ -57,6 +63,8 @@ interface GameResult {
   distances: (number | null)[]
   totalScore: number
   totalDistance: number
+  totalLatDistance?: number
+  totalLngDistance?: number
   isDisqualified: boolean
   disqualifiedMessage: string | null
   isAllRandomPlonk: boolean
@@ -80,6 +88,14 @@ interface ScoreboardRow {
     value: number
     display: number | string
   }
+  latDistance?: {
+    value: number
+    display: number | string
+  }
+  lngDistance?: {
+    value: number
+    display: number | string
+  }
   score?: {
     value: number
     display: number | string
@@ -92,6 +108,8 @@ interface ScoreboardRow {
   scores?: (number | null)[]
   totalScore?: number
   totalDistance?: number
+  totalLatDistance?: number
+  totalLngDistance?: number
   disqualifiedMessage?: string | null
   isAllRandomPlonk?: boolean
   brCounter?: number
@@ -119,6 +137,9 @@ type GameType = 'standard' | 'streak'
 type GameStatus = 'started' | 'finished'
 
 type GameState = 'in-round' | 'round-results' | 'game-results' | 'none'
+
+/** Which distance feeds the score curve, see Settings -> Lat/Lng Mode. */
+type ScoringMode = 'off' | 'latitude' | 'longitude' | 'latlng'
 
 interface Seed {
   token: string

@@ -507,7 +507,8 @@ export default class GameHandler {
               settings.isBRMode,
               this.#game.getModeHelpStartOfRound(),
               restoredGuesses,
-              this.#game.getLocation()
+              this.#game.getLocation(),
+              settings.scoringMode
             )
 
             if (restoredGuesses.length > 0) {
@@ -557,6 +558,7 @@ export default class GameHandler {
             this.#win.webContents.send(
               'round-started',
               this.#game.getModeHelpStartOfRound(),
+              settings.scoringMode
             )
           }
         } 
@@ -1012,6 +1014,12 @@ export default class GameHandler {
 
     if (settings.isDartsMode)
       returnString += `dartsMode: ${settings.dartsTargetScore} ${settings.isDartsModeBust?"bust":""} | `
+    if (settings.scoringMode === "latitude")
+      returnString += `Scoring: latitude only | `
+    if (settings.scoringMode === "longitude")
+      returnString += `Scoring: longitude only | `
+    if (settings.scoringMode === "latlng")
+      returnString += `Scoring: lat/lng | `
     if (returnString === "")
       returnString = "No special modes activated"
     if (settings.modifierMinusPointsIfWrongCountry && settings.modifierMinusPointsIfWrongCountry !== 0)

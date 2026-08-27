@@ -351,7 +351,7 @@
 
     <hr />
     <div>
-      <h2>Scoring Mode</h2>
+      <h2>Lat/Lng Mode</h2>
       <div class="ml-05">
         <label class="form__group" data-tip="Off - normal GeoGuessr scoring">
           Off
