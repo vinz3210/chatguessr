@@ -1369,6 +1369,26 @@ export default class GameHandler {
       return
     }
 
+    if (message.startsWith("!wandompwonk")) {
+      if (!this.#game.isInGame) return
+
+      this.#backend?.sendMessage(`@${userstate.username} uwu`).catch((err) => {
+        console.error(err)
+      })
+
+      var { lat, lng } = await getRandomCoordsInLand(this.#game.seed!.bounds);
+      if (this.#game.waterPlonkMode === "mandatory") {
+        const newCoords = await getRandomCoordsNotInLand(this.#game.seed!.bounds);
+        lat = newCoords.lat;
+        lng = newCoords.lng;
+      }
+
+      const randomGuess = `!g ${lat}, ${lng}`
+      this.#handleGuess(userstate, randomGuess, true).catch((err) => {
+        console.error(err)
+      })
+      return
+    }
     if (message.startsWith(settings.randomPlonkWaterCmd) || message.startsWith("!taquitoplonk")) {
       if (!this.#game.isInGame) return
 
