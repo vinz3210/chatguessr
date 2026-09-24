@@ -91,6 +91,12 @@
     </button>
   </div>
 
+  <AiDescriptionOverlay
+    :game-state
+    :settings-visible
+    :get-street-view="() => MWStreetViewInstance"
+  />
+
   <Suspense>
     <Modal :is-visible="settingsVisible" @close="settingsVisible = false">
       <Settings :socket-connection-state :twitch-connection-state />
@@ -114,6 +120,7 @@ import Modal from './ui/Modal.vue'
 import Scoreboard from './Scoreboard.vue'
 import Leaderboard from './Leaderboard/Leaderboard.vue'
 import Timer from './Timer.vue'
+import AiDescriptionOverlay from './AiDescriptionOverlay.vue'
 
 import IconDice from '@/assets/icons/dice.svg'
 import IconRotateRight from '@/assets/icons/rotate-right.svg'
@@ -322,7 +329,8 @@ function getClosestHeadingPano(currentHeading: number, streetViewInstance): stri
 async function rotationFunction(){
       const settings = await chatguessrApi.getSettings()
 
-    if (settings.autorotateAtStart) {
+    // Nobody sees the spin in AI Description Mode, and it would blur the panorama capture.
+    if (settings.autorotateAtStart && !settings.aiDescriptionMode) {
       setTimeout(() => {
         console.log("!!!!!!!!!!!!!!!")
         onSpinLeft360()

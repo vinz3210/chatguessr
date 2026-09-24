@@ -134,7 +134,9 @@ export default class WebGLContextWrapper {
 		///// ######################## error might be somewhere around here - V
 		if (this.canvas.parentElement && this.canvas.classList.contains('widget-scene-canvas')) {
 			const thees = this;
-			const webglContext = this.contextCreator('webgl') as WebGLRenderingContext;
+			// preserveDrawingBuffer keeps the last frame readable after it has been shown, so AI
+			// Description Mode can capture the panorama at any time (see panoramaCapture.ts).
+			const webglContext = this.contextCreator('webgl', { preserveDrawingBuffer: true }) as WebGLRenderingContext;
 			const postProcessHandler = new PostprocessHandler(
 				this.canvas,
 				webglContext,

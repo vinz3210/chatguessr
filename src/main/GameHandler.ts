@@ -4,6 +4,7 @@ import { io } from 'socket.io-client'
 import Game from './Game'
 import TwitchBackend from './utils/useTwitchJS'
 import { settings, saveSettings } from './utils/useSettings'
+import useAiDescription from './utils/useAiDescription'
 import countryIso from 'coordinate_to_country'
 
 import {
@@ -669,6 +670,10 @@ export default class GameHandler {
       return settings
     })
 
+    useAiDescription(() =>
+      this.#game.isInGame && this.#game.seed ? this.#game.getLocation() : undefined
+    )
+
     ipcMain.on('save-settings', (_event, settings_: Settings) => {
       saveSettings(settings_)
     })
@@ -1020,6 +1025,8 @@ export default class GameHandler {
       returnString += `Scoring: longitude only | `
     if (settings.scoringMode === "latlng")
       returnString += `Scoring: lat/lng | `
+    if (settings.aiDescriptionMode)
+      returnString += `AI Description: on | `
     if (returnString === "")
       returnString = "No special modes activated"
     if (settings.modifierMinusPointsIfWrongCountry && settings.modifierMinusPointsIfWrongCountry !== 0)

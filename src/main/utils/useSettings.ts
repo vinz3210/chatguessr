@@ -80,6 +80,9 @@ const defaultSettings = {
   scoringMode: "off",
   rotationDuration: 15,
   autorotateAtStart: false,
+  aiDescriptionMode: false,
+  // The OpenRouter API key is kept out of here on purpose: settings are readable from the page.
+  aiDescriptionModel: 'google/gemini-3.8-flash',
 }
 
 const settings = Object.assign({}, defaultSettings, storedSettings)

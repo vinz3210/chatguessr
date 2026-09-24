@@ -373,6 +373,61 @@
     </div>
 
     <hr />
+    <h2>AI Description Mode</h2>
+    <div class="ml-05">
+      <label
+        class="form__group"
+        data-tip="Hides the Street View and shows an AI-written description of it instead"
+      >
+        AI Description Mode
+        <input v-model="settings.aiDescriptionMode" type="checkbox" />
+      </label>
+      <div
+        class="form__group"
+        data-tip="Create a key at openrouter.ai/keys. It is only stored on this computer"
+      >
+        OpenRouter API key {{ aiApiKeyStatus.isSet ? `(saved ${aiApiKeyStatus.hint})` : '(not set)' }} :
+        <div class="flex gap-02">
+          <input
+            v-model.trim="aiApiKeyInput"
+            type="password"
+            placeholder="sk-or-…"
+            spellcheck="false"
+            autocomplete="off"
+            style="width: 200px"
+            @keyup.enter="saveAiApiKey(aiApiKeyInput)"
+          />
+          <button
+            class="btn bg-primary"
+            :disabled="!aiApiKeyInput"
+            @click="saveAiApiKey(aiApiKeyInput)"
+          >
+            Save
+          </button>
+          <button v-if="aiApiKeyStatus.isSet" class="btn bg-danger" @click="saveAiApiKey('')">
+            Remove
+          </button>
+        </div>
+      </div>
+      <label
+        class="form__group"
+        data-tip="Any OpenRouter model that accepts images (default: google/gemini-3.8-flash)"
+      >
+        AI model{{ isKnownVisionModel ? '' : ' (not a known image model)' }} :
+        <input
+          v-model.trim="settings.aiDescriptionModel"
+          type="text"
+          list="cg-ai-models"
+          spellcheck="false"
+          style="width: 260px"
+        />
+      </label>
+      <datalist id="cg-ai-models">
+        <option v-for="model of aiModels" :key="model.id" :value="model.id">{{ model.name }}</option>
+      </datalist>
+    </div>
+
+    <hr />
     <div class="grid-col">
       <div>
         <h2>Countdown /-up / ABC / Alphabet Settings</h2>
@@ -679,7 +734,7 @@
 </template>
 
 <script setup lang="ts">
-import { shallowRef, shallowReactive, reactive, watch } from 'vue'
+import { shallowRef, shallowReactive, reactive, watch, computed } from 'vue'
 import { useClipboard } from '@vueuse/core'
 import Tabs from './ui/Tabs.vue'
 import Userscripts from './Userscripts.vue'
@@ -745,6 +800,31 @@ const removeBannedUser = (index: number, user: { username: string }) => {
 
 const currentVerion = shallowRef(await chatguessrApi.getCurrentVersion())
 
+// The API key never enters `settings`; the page only learns whether one is saved.
+const aiApiKeyStatus = shallowRef<AiApiKeyStatus>(await chatguessrApi.getAiApiKeyStatus())
+const aiApiKeyInput = shallowRef('')
+const saveAiApiKey = async (apiKey: string) => {
+  aiApiKeyStatus.value = await chatguessrApi.setAiApiKey(apiKey)
+  aiApiKeyInput.value = ''
+}
+
+// Fetched from OpenRouter, so only once someone actually opens the mode settings.
+const aiModels = shallowRef<AiModelOption[]>([])
+watch(
+  currentTab,
+  async (tab) => {
+    if (tab === 'mode-settings' && aiModels.value.length === 0) {
+      aiModels.value = await chatguessrApi.getAiVisionModels()
+    }
+  },
+  { immediate: true }
+)
+const isKnownVisionModel = computed(
+  () =>
+    aiModels.value.length === 0 ||
+    aiModels.value.some((model) => model.id === settings.aiDescriptionModel)
+)
+
 function modifyIsMultiGusssOnBRMode(event) {
 
   if(event.target.checked)
@@ -773,6 +853,7 @@ const resetModeSettings = () => {
   settings.ABCModeLetters = "ABCDE"
   settings.waterPlonkMode = "normal"
   settings.modifierMinusPointsIfWrongCountry = 0
+  settings.aiDescriptionMode = false
 }
 
 </script>

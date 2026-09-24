@@ -99,6 +99,26 @@ export const chatguessrApi = {
     return ipcRenderer.invoke('userscripts:open-folder')
   },
 
+  getAiApiKeyStatus(): Promise<AiApiKeyStatus> {
+    return ipcRenderer.invoke('ai-description:get-api-key-status')
+  },
+
+  setAiApiKey(apiKey: string): Promise<AiApiKeyStatus> {
+    return ipcRenderer.invoke('ai-description:set-api-key', apiKey)
+  },
+
+  getAiVisionModels(): Promise<AiModelOption[]> {
+    return ipcRenderer.invoke('ai-description:list-models')
+  },
+
+  getCachedAiDescription(): Promise<AiDescription | null> {
+    return ipcRenderer.invoke('ai-description:get-cached')
+  },
+
+  describePanorama(request: AiDescriptionRequest): Promise<AiDescriptionResult> {
+    return ipcRenderer.invoke('ai-description:describe', request)
+  },
+
   onGameStarted(
     callback: (
       isMultiGuess: boolean,

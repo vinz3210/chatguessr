@@ -333,6 +333,33 @@ interface UserscriptPayload {
   info: Record<string, unknown>
 }
 
+type AiDescription = {
+  text: string
+  model: string
+  heading: number
+  pitch: number
+}
+
+type AiDescriptionRequest = {
+  /** JPEG data URL of what the Street View showed. */
+  image: string
+  heading: number
+  pitch: number
+}
+
+type AiDescriptionResult = { ok: true; description: AiDescription } | { ok: false; error: string }
+
+type AiApiKeyStatus = {
+  isSet: boolean
+  /** Masked tail of the stored key, e.g. `…a1b2`. */
+  hint: string
+}
+
+type AiModelOption = {
+  id: string
+  name: string
+}
+
 interface UserscriptInstallResult {
   ok: boolean
   script?: UserscriptInfo

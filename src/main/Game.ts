@@ -574,6 +574,9 @@ export default class Game {
     if (this.#settings.scoringMode === 'latlng') {
       parts.push('Lat/Lng scoring 🧭')
     }
+    if (this.#settings.aiDescriptionMode) {
+      parts.push('AI description 🤖')
+    }
     if (this.#settings.waterPlonkMode !== "normal") {
       if (this.#settings.waterPlonkMode === "illegal") {
         parts.push("🌊❌")
