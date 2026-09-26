@@ -6,6 +6,7 @@ import './assets/styles.css'
 import './mods/extenssrPostProcessing'
 import './mods/noCarNoCompass'
 import './mods/extenssrMenuItemsPlugin'
+import './mods/guessGuessMode'
 
 // MAIN FRAME
 const wrapper = document.createElement('div')
