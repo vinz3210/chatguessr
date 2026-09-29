@@ -57,6 +57,38 @@
   display: none !important;
 }
 
+/* The map title is absolutely positioned, so the panel needs its own width
+   when the rounds body (which normally determines that width) is hidden. */
+[class^='rounds-status_panel__'] {
+  width: min(26rem, calc(100vw - 2rem));
+}
+
+[class^='rounds-status_panel__'] [class^='rounds-status_mapTitle__'] {
+  border-bottom: none;
+}
+
+[class^='rounds-status_panel__'] [class^='rounds-status_mapTitle__'][data-cg-rounds]::after {
+  content: attr(data-cg-rounds);
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  color: var(--ds-color-white-100);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[class^='rounds-status_panel__'] [class^='rounds-status_mapTitle__'][data-cg-rounds]
+  [data-qa='rounds-status-map-name'] {
+  right: 8rem;
+  text-align: left;
+}
+
+[class^='rounds-status_panel__'] [class^='rounds-status_body__'] {
+  display: none !important;
+}
+
 /* removes game breakdown button */
 [class^='standard-final-result_wrapper__'] > div:first-child {
   display: none;

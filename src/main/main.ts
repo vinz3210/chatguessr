@@ -11,6 +11,7 @@ import { supabase } from './utils/useSupabase'
 import { store } from './utils/store'
 import { loadCustomFlags, findFlagFile } from './lib/flags/flags'
 import useScripts from './lib/useScripts'
+import useTts from './tts/useTts'
 import { version } from '../../package.json'
 
 if (process.platform == 'win32') updateElectronApp()
@@ -30,6 +31,7 @@ app.whenReady().then(async () => {
   // Registered synchronously with window creation, so the preload's payload
   // request is always answered before the first page load.
   useScripts(appDataPath, mainWindow)
+  useTts(appDataPath, mainWindow)
 
   const gameHandler = new GameHandler(db, mainWindow, {
     async requestAuthentication() {

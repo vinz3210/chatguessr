@@ -701,6 +701,21 @@
       </div>
     </div>
 
+    <div v-show="currentTab === 'ai-voice'" class="content">
+      <h2>AI voice <small>(reads AI descriptions aloud)</small></h2>
+      <LocalVoiceSettings
+        v-if="settings.ttsProvider === 'local'"
+        v-model:enabled="settings.ttsEnabled"
+      />
+      <SpeechSettings
+        v-else
+        v-model:enabled="settings.ttsEnabled"
+        v-model:model="settings.ttsModel"
+        v-model:voice="settings.ttsVoice"
+        :active="currentTab === 'ai-voice'"
+      />
+    </div>
+
     <div v-show="currentTab === 'userscripts'" class="content">
       <h2>Userscripts <small>(Tampermonkey compatible)</small></h2>
       <Userscripts />
@@ -738,6 +753,8 @@ import { shallowRef, shallowReactive, reactive, watch, computed } from 'vue'
 import { useClipboard } from '@vueuse/core'
 import Tabs from './ui/Tabs.vue'
 import Userscripts from './Userscripts.vue'
+import LocalVoiceSettings from './LocalVoiceSettings.vue'
+import SpeechSettings from './SpeechSettings.vue'
 import IconTwitch from '@/assets/icons/twitch.svg'
 
 const { chatguessrApi } = window
@@ -764,6 +781,7 @@ const tabs = shallowRef([
   { name: 'twitch-connect', value: 'Twitch connect' },
   { name: 'ban-list', value: 'Ban list' },
   { name: 'messages', value: 'Messages' },
+  { name: 'ai-voice', value: 'AI voice' },
   { name: 'userscripts', value: 'Userscripts' }
 ])
 

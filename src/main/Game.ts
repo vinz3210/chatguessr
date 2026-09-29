@@ -479,6 +479,8 @@ export default class Game {
       distance,
       latDistance: axisDistances.lat,
       lngDistance: axisDistances.lng,
+      latDegrees: axisDistances.latDeg,
+      lngDegrees: axisDistances.lngDeg,
       score,
       modified,
       isRandomPlonk,
@@ -659,7 +661,13 @@ export default class Game {
     return this.#db.getRoundResults(this.#roundId!).map((result) => {
       if (!target || !result.position) return result
       const axisDistances = getAxisDistances(result.position, target)
-      return { ...result, latDistance: axisDistances.lat, lngDistance: axisDistances.lng }
+      return {
+        ...result,
+        latDistance: axisDistances.lat,
+        lngDistance: axisDistances.lng,
+        latDegrees: axisDistances.latDeg,
+        lngDegrees: axisDistances.lngDeg
+      }
     })
   }
 
@@ -683,13 +691,17 @@ export default class Game {
       // map drawing already makes. Missing guesses (skipped rounds) are null.
       let totalLatDistance = 0
       let totalLngDistance = 0
+      let totalLatDegrees = 0
+      let totalLngDegrees = 0
       result.guesses.forEach((guess, i) => {
         if (!guess || !locations[i]) return
         const axisDistances = getAxisDistances(guess, locations[i])
         totalLatDistance += axisDistances.lat
         totalLngDistance += axisDistances.lng
+        totalLatDegrees += axisDistances.latDeg
+        totalLngDegrees += axisDistances.lngDeg
       })
-      return { ...result, totalLatDistance, totalLngDistance }
+      return { ...result, totalLatDistance, totalLngDistance, totalLatDegrees, totalLngDegrees }
     })
   }
 

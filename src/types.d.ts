@@ -34,6 +34,10 @@ interface Guess {
   latDistance?: number
   /** Longitude-only distance in km, shown when a lat/lng scoring mode is active. */
   lngDistance?: number
+  /** Latitude difference in degrees, shown when a lat/lng scoring mode is active. */
+  latDegrees?: number
+  /** Longitude difference in degrees, shown when a lat/lng scoring mode is active. */
+  lngDegrees?: number
   score: number
   modified?: boolean
   isRandomPlonk?: boolean
@@ -48,6 +52,8 @@ interface RoundResult {
   distance: number
   latDistance?: number
   lngDistance?: number
+  latDegrees?: number
+  lngDegrees?: number
   score: number
   totalScore: number
   isRandomPlonk: boolean
@@ -65,6 +71,8 @@ interface GameResult {
   totalDistance: number
   totalLatDistance?: number
   totalLngDistance?: number
+  totalLatDegrees?: number
+  totalLngDegrees?: number
   isDisqualified: boolean
   disqualifiedMessage: string | null
   isAllRandomPlonk: boolean
@@ -93,6 +101,14 @@ interface ScoreboardRow {
     display: number | string
   }
   lngDistance?: {
+    value: number
+    display: number | string
+  }
+  latDegrees?: {
+    value: number
+    display: number | string
+  }
+  lngDegrees?: {
     value: number
     display: number | string
   }
@@ -335,6 +351,7 @@ interface UserscriptPayload {
 
 type AiDescription = {
   text: string
+  summary?: string
   model: string
   heading: number
   pitch: number
@@ -349,6 +366,10 @@ type AiDescriptionRequest = {
 
 type AiDescriptionResult = { ok: true; description: AiDescription } | { ok: false; error: string }
 
+type AiChatMessage = { role: 'user' | 'assistant'; content: string }
+
+type AiChatResult = { ok: true; answer: string } | { ok: false; error: string }
+
 type AiApiKeyStatus = {
   isSet: boolean
   /** Masked tail of the stored key, e.g. `…a1b2`. */
@@ -358,6 +379,28 @@ type AiApiKeyStatus = {
 type AiModelOption = {
   id: string
   name: string
+}
+
+type TtsStatus = {
+  modelReady: boolean
+  /** Bytes so far while the voice model is downloading. */
+  download: { received: number; total: number } | null
+  /** Length of the saved voice clip; null when none is saved. */
+  voiceSeconds: number | null
+}
+
+type TtsResult = { ok: true } | { ok: false; error: string }
+
+/** A piece of speech: raw samples from the local engine or Gemini, or encoded audio from OpenRouter. */
+type TtsChunk =
+  | { kind: 'pcm'; samples: Float32Array; sampleRate: number }
+  | { kind: 'encoded'; data: Uint8Array }
+
+type SpeechModelOption = {
+  id: string
+  name: string
+  /** Empty when the model has no voice list (it then uses its default voice). */
+  voices: string[]
 }
 
 interface UserscriptInstallResult {

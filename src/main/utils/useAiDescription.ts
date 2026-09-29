@@ -1,9 +1,22 @@
 import { ipcMain } from 'electron'
 import { store } from './store'
 import { settings } from './useSettings'
-import { describePanorama, describeRequestError, fetchVisionModels } from './openRouter'
+import {
+  askAboutPanorama,
+  describePanorama,
+  describeRequestError,
+  fetchVisionModels
+} from './openRouter'
 
-const MAX_CACHED_DESCRIPTIONS = 50
+// Each round keeps its image (~200 KB) so follow-up questions can look at it again.
+const MAX_CACHED_ROUNDS = 20
+const MAX_QUESTION_CHARS = 300
+
+type Round = {
+  request: AiDescriptionRequest
+  description: AiDescription
+  chat: AiChatMessage[]
+}
 
 /**
  * IPC for AI Description Mode. The renderer captures the panorama; everything that touches
@@ -11,24 +24,37 @@ const MAX_CACHED_DESCRIPTIONS = 50
  * with GeoGuessr's own scripts.
  */
 export default function useAiDescription(getLocation: () => Location_ | undefined) {
-  // Keyed by round location, so a page reload mid-round shows the same text without paying
-  // for a second request.
-  const descriptionCache = new Map<string, AiDescription>()
+  // Keyed by round location, so a page reload mid-round shows the same text and chat without
+  // paying for them again.
+  const rounds = new Map<string, Round>()
   let visionModels: Promise<AiModelOption[]> | undefined
 
   const locationKey = (location: LatLng) => `${location.lat},${location.lng}`
+  const currentRound = () => {
+    const location = getLocation()
+    return location ? rounds.get(locationKey(location)) : undefined
+  }
 
-  const remember = (key: string, description: AiDescription) => {
-    descriptionCache.delete(key)
-    descriptionCache.set(key, description)
-    if (descriptionCache.size > MAX_CACHED_DESCRIPTIONS) {
-      descriptionCache.delete(descriptionCache.keys().next().value!)
-    }
+  const remember = (key: string, round: Round) => {
+    rounds.delete(key)
+    rounds.set(key, round)
+    if (rounds.size > MAX_CACHED_ROUNDS) rounds.delete(rounds.keys().next().value!)
   }
 
   const apiKeyStatus = (): AiApiKeyStatus => {
     const apiKey = store.get('openRouterApiKey')
     return { isSet: !!apiKey, hint: apiKey ? `…${apiKey.slice(-4)}` : '' }
+  }
+
+  // Why a request can't be made, or null when it can.
+  const missingSetup = () => {
+    if (!store.get('openRouterApiKey')) {
+      return 'No OpenRouter API key set. Add one in Settings → Mode settings.'
+    }
+    if (!settings.aiDescriptionModel.trim()) {
+      return 'No AI model set. Pick one in Settings → Mode settings.'
+    }
+    return null
   }
 
   ipcMain.handle('ai-description:get-api-key-status', () => apiKeyStatus())
@@ -52,31 +78,24 @@ export default function useAiDescription(getLocation: () => Location_ | undefine
     return visionModels
   })
 
-  ipcMain.handle('ai-description:get-cached', () => {
-    const location = getLocation()
-    return (location && descriptionCache.get(locationKey(location))) ?? null
-  })
+  ipcMain.handle('ai-description:get-cached', () => currentRound()?.description ?? null)
 
   ipcMain.handle(
     'ai-description:describe',
     async (_event, request: AiDescriptionRequest): Promise<AiDescriptionResult> => {
-      const apiKey = store.get('openRouterApiKey')
-      if (!apiKey) {
-        return {
-          ok: false,
-          error: 'No OpenRouter API key set. Add one in Settings → Mode settings.'
-        }
-      }
-      const model = settings.aiDescriptionModel.trim()
-      if (!model) {
-        return { ok: false, error: 'No AI model set. Pick one in Settings → Mode settings.' }
-      }
+      const problem = missingSetup()
+      if (problem) return { ok: false, error: problem }
 
       // Read before awaiting: the round may be over by the time the model answers.
       const location = getLocation()
       try {
-        const description = await describePanorama(apiKey, model, request)
-        if (location) remember(locationKey(location), description)
+        const description = await describePanorama(
+          store.get('openRouterApiKey')!,
+          settings.aiDescriptionModel.trim(),
+          request
+        )
+        // A new description starts a new conversation.
+        if (location) remember(locationKey(location), { request, description, chat: [] })
         return { ok: true, description }
       } catch (err) {
         // Log the message only: an axios error carries the Authorization header.
@@ -86,4 +105,32 @@ export default function useAiDescription(getLocation: () => Location_ | undefine
       }
     }
   )
+
+  ipcMain.handle('ai-description:get-chat', () => currentRound()?.chat ?? [])
+
+  ipcMain.handle('ai-description:ask', async (_event, question: string): Promise<AiChatResult> => {
+    const problem = missingSetup()
+    if (problem) return { ok: false, error: problem }
+    const asked = String(question).trim().slice(0, MAX_QUESTION_CHARS)
+    if (!asked) return { ok: false, error: 'Type a question first.' }
+    const round = currentRound()
+    if (!round) return { ok: false, error: 'Wait for the description to finish first.' }
+
+    try {
+      const answer = await askAboutPanorama(
+        store.get('openRouterApiKey')!,
+        settings.aiDescriptionModel.trim(),
+        round.request,
+        round.description.text,
+        round.chat,
+        asked
+      )
+      round.chat.push({ role: 'user', content: asked }, { role: 'assistant', content: answer })
+      return { ok: true, answer }
+    } catch (err) {
+      const error = describeRequestError(err)
+      console.error('[ai-description] question failed:', error)
+      return { ok: false, error }
+    }
+  })
 }

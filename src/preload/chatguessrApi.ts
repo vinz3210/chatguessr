@@ -119,6 +119,63 @@ export const chatguessrApi = {
     return ipcRenderer.invoke('ai-description:describe', request)
   },
 
+  /** The follow-up conversation of the current round. */
+  getAiChat(): Promise<AiChatMessage[]> {
+    return ipcRenderer.invoke('ai-description:get-chat')
+  },
+
+  askAboutPanorama(question: string): Promise<AiChatResult> {
+    return ipcRenderer.invoke('ai-description:ask', question)
+  },
+
+  getTtsStatus(): Promise<TtsStatus> {
+    return ipcRenderer.invoke('tts:get-status')
+  },
+
+  downloadTtsModel(): Promise<TtsResult> {
+    return ipcRenderer.invoke('tts:download-model')
+  },
+
+  /** `null` once the download has ended, successfully or not. */
+  onTtsDownloadProgress(
+    callback: (progress: { received: number; total: number } | null) => void
+  ) {
+    return ipcRendererOn('tts:download-progress', callback)
+  },
+
+  saveTtsVoice(samples: Float32Array, sampleRate: number): Promise<TtsStatus> {
+    return ipcRenderer.invoke('tts:save-voice', samples, sampleRate)
+  },
+
+  deleteTtsVoice(): Promise<TtsStatus> {
+    return ipcRenderer.invoke('tts:delete-voice')
+  },
+
+  /** Audio arrives through `onTtsChunk` tagged with `id`, then `onTtsDone` or `onTtsError`. */
+  speak(id: string, text: string): Promise<TtsResult> {
+    return ipcRenderer.invoke('tts:speak', id, text)
+  },
+
+  stopSpeaking(id: string) {
+    ipcRenderer.send('tts:stop', id)
+  },
+
+  onTtsChunk(callback: (id: string, chunk: TtsChunk) => void) {
+    return ipcRendererOn('tts:chunk', callback)
+  },
+
+  getSpeechModels(): Promise<SpeechModelOption[]> {
+    return ipcRenderer.invoke('tts:list-speech-models')
+  },
+
+  onTtsDone(callback: (id: string) => void) {
+    return ipcRendererOn('tts:done', callback)
+  },
+
+  onTtsError(callback: (id: string, message: string) => void) {
+    return ipcRendererOn('tts:error', callback)
+  },
+
   onGameStarted(
     callback: (
       isMultiGuess: boolean,

@@ -171,3 +171,18 @@ describe('parseUserDate', () => {
     )
   })
 })
+
+describe('getAxisDistances', () => {
+  it('returns the per-axis miss in degrees', () => {
+    const axis = GameHelper.getAxisDistances({ lat: 10, lng: 20 }, { lat: -5, lng: 50 })
+    expect(axis.latDeg).toBeCloseTo(15)
+    expect(axis.lngDeg).toBeCloseTo(30)
+    expect(axis.lat).toBeCloseTo(15 * 111.32)
+  })
+
+  it('takes the short way around across the antimeridian', () => {
+    const axis = GameHelper.getAxisDistances({ lat: 0, lng: 179 }, { lat: 0, lng: -179 })
+    expect(axis.lngDeg).toBeCloseTo(2)
+    expect(axis.lng).toBeCloseTo(2 * 111.32)
+  })
+})

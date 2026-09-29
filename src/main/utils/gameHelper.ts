@@ -168,23 +168,30 @@ function modifyScore(score: number, modifier: number, allowMinus: boolean, round
 }
 
 /**
- * Returns the axis-only distance in km between a guess and the target location.
+ * Returns the axis-only distance between a guess and the target location, both
+ * in km (`lat`/`lng`, used for scoring) and in degrees (`latDeg`/`lngDeg`, shown
+ * on the scoreboard).
  *
  * When only one axis (latitude or longitude) is used for scoring, the other axis
  * is ignored entirely. For longitude, the degree->km conversion is corrected by
  * cos(latitude), otherwise the same degree offset would count wildly differently
  * near the poles vs. the equator.
  */
-export function getAxisDistances(guess: LatLng, target: LatLng): { lat: number; lng: number } {
+export function getAxisDistances(
+  guess: LatLng,
+  target: LatLng
+): { lat: number; lng: number; latDeg: number; lngDeg: number } {
   const latDeg = Math.abs(guess.lat - target.lat)
   const latKm = latDeg * 111.32
 
+  // Take the short way around, so 179 vs -179 is 2 degrees apart and not 358.
+  const rawLngDeg = Math.abs(guess.lng - target.lng) % 360
+  const lngDeg = Math.min(rawLngDeg, 360 - rawLngDeg)
   // Longitude degree length depends on latitude: 111.32 * cos(lat) km per degree
-  const lngDeg = Math.abs(guess.lng - target.lng)
   const midLatRad = ((guess.lat + target.lat) / 2) * (Math.PI / 180)
   const lngKm = lngDeg * 111.32 * Math.cos(midLatRad)
 
-  return { lat: latKm, lng: lngKm }
+  return { lat: latKm, lng: lngKm, latDeg, lngDeg }
 }
 
 export function calculateScore(distance: number, scale: number, isCorrectCountry: boolean, isClosestInWrongCountryModeActivated: boolean,  waterPlonkMode: string, isPlonkOnLand: boolean, invertScores: boolean, modifierMinusPointsIfWrongCountry: number, isBRMode: boolean, battleRoyaleSubtractedPoints: number, allowMinus: boolean,  maxErrorDistance?: number, roundNumber?: number, roundMultis?: string, randomRoundMultiplier?: number, scoringMode?: string, axisDistances?: { lat: number; lng: number }): number {

@@ -155,6 +155,21 @@ const appendModsControlsComponent = () => {
   appendToFloatingHost()
 }
 
+function updateRoundStatusTitle() {
+  const panel = document.querySelector('[data-qa="rounds-status"]')
+  const title = panel?.querySelector<HTMLElement>('[class^="rounds-status_mapTitle__"]')
+  if (!title) return
+
+  const round = panel?.querySelector('[data-qa="current-round-number"]')?.textContent?.trim()
+  const total = panel?.querySelectorAll('[data-qa="round"]').length ?? 0
+  const label = round && total ? `${round}/${total} rounds` : ''
+  if (label) {
+    if (title.dataset.cgRounds !== label) title.dataset.cgRounds = label
+  } else if (title.hasAttribute('data-cg-rounds')) {
+    title.removeAttribute('data-cg-rounds')
+  }
+}
+
 // Coalesce to one placement pass per frame. Leaving a game churns through
 // thousands of body mutations while GeoGuessr tears down and rebuilds the page;
 // running the (document-wide, multi-selector) placement sweep on every single
@@ -169,6 +184,7 @@ const scheduleModsControlsPlacement = () => {
     placementScheduled = false
     try {
       appendModsControlsComponent()
+      updateRoundStatusTitle()
     } catch (err) {
       // A placement failure must never escape into the observer callback and
       // repeat on every mutation.

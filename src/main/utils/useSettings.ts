@@ -83,6 +83,13 @@ const defaultSettings = {
   aiDescriptionMode: false,
   // The OpenRouter API key is kept out of here on purpose: settings are readable from the page.
   aiDescriptionModel: 'google/gemini-3.8-flash',
+  // Opt-in: every read-aloud is a paid OpenRouter request.
+  ttsEnabled: false,
+  // 'local' (Pocket TTS on this computer, voice cloned from a recording) is still wired up but
+  // has no UI to pick it; set it in config.json to work on it.
+  ttsProvider: 'openrouter' as 'openrouter' | 'local',
+  ttsModel: 'hexgrad/kokoro-82m',
+  ttsVoice: 'af_heart',
 }
 
 const settings = Object.assign({}, defaultSettings, storedSettings)

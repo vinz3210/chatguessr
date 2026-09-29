@@ -37,20 +37,13 @@
             {{ colName('distance') }}
           </button>
           <button
-            v-if="isAxisColumnAvailable('latDistance')"
-            :class="['btn', { active: settings.latDistance }]"
+            v-for="col in availableAxisColumns"
+            :key="col"
+            :class="['btn', { active: settings[col] }]"
             :disabled="isMultiGuess && !props.isBRMode"
-            @click="settings.latDistance = !settings.latDistance"
+            @click="settings[col] = !settings[col]"
           >
-            {{ colName('latDistance') }}
-          </button>
-          <button
-            v-if="isAxisColumnAvailable('lngDistance')"
-            :class="['btn', { active: settings.lngDistance }]"
-            :disabled="isMultiGuess && !props.isBRMode"
-            @click="settings.lngDistance = !settings.lngDistance"
-          >
-            {{ colName('lngDistance') }}
+            {{ colName(col) }}
           </button>
           <button
             :class="['btn', { active: settings.score }]"
@@ -256,6 +249,8 @@ const defaultScoreboardSettings = {
   distance: true,
   latDistance: true,
   lngDistance: true,
+  latDegrees: true,
+  lngDegrees: true,
   score: true,
   totalScore: true
 }
@@ -311,6 +306,8 @@ const round_columns: Column[] = [
   { name: 'Distance', value: 'distance', width: '80px', sortable: true },
   { name: 'Lat', value: 'latDistance', width: '70px', sortable: true },
   { name: 'Lng', value: 'lngDistance', width: '70px', sortable: true },
+  { name: 'Lat°', value: 'latDegrees', width: '58px', sortable: true },
+  { name: 'Lng°', value: 'lngDegrees', width: '58px', sortable: true },
   { name: 'Score', value: 'score', width: '65px', sortable: true },
   { name: 'Total', value: 'totalScore', width: '65px', sortable: true }
 ]
@@ -321,6 +318,8 @@ const end_columns: Column[] = [
   { name: 'Distance', value: 'distance', width: '80px', sortable: true },
   { name: 'Lat', value: 'latDistance', width: '70px', sortable: true },
   { name: 'Lng', value: 'lngDistance', width: '70px', sortable: true },
+  { name: 'Lat°', value: 'latDegrees', width: '58px', sortable: true },
+  { name: 'Lng°', value: 'lngDegrees', width: '58px', sortable: true },
   { name: 'Score', value: 'score', width: '65px', sortable: true }
 ]
 
@@ -330,21 +329,26 @@ function colName(value: string) {
   return round_columns.find((col) => col.value === value)!.name
 }
 
+/** Per-axis miss columns, in km and in degrees. */
+const axisColumns = ['latDistance', 'lngDistance', 'latDegrees', 'lngDegrees'] as const
+
 /**
- * The per-axis distance columns only carry meaning for the scoring mode that
- * actually scores on that axis, so they stay hidden for the others.
+ * The per-axis columns only carry meaning for the scoring mode that actually
+ * scores on that axis, so they stay hidden for the others.
  */
 function isAxisColumnAvailable(value: string) {
-  if (value === 'latDistance')
+  if (value === 'latDistance' || value === 'latDegrees')
     return props.scoringMode === 'latitude' || props.scoringMode === 'latlng'
-  if (value === 'lngDistance')
+  if (value === 'lngDistance' || value === 'lngDegrees')
     return props.scoringMode === 'longitude' || props.scoringMode === 'latlng'
   return true
 }
 
+const availableAxisColumns = computed(() => axisColumns.filter(isAxisColumnAvailable))
+
 /** Axis columns are additionally toggleable from the gear menu. */
 function isAxisColumnVisible(value: string) {
-  if (value !== 'latDistance' && value !== 'lngDistance') return true
+  if (!(axisColumns as readonly string[]).includes(value)) return true
   return isAxisColumnAvailable(value) && settings[value] === true
 }
 
@@ -390,7 +394,9 @@ function renderGuess(guess: Guess) {
     },
     distance: { value: guess.distance, display: toMeter(guess.distance) },
     latDistance: axisCell(guess.latDistance),
+    latDegrees: axisCell(guess.latDegrees, toDegrees),
     lngDistance: axisCell(guess.lngDistance),
+    lngDegrees: axisCell(guess.lngDegrees, toDegrees),
     score: { value: guess.score, display: guess.score },
     isRandomPlonk: guess.isRandomPlonk,
     modified: guess.modified,
@@ -416,6 +422,8 @@ function renderMultiGuess(guess: Guess) {
     distance: { value: 0, display: '' },
     latDistance: { value: 0, display: '' },
     lngDistance: { value: 0, display: '' },
+    latDegrees: { value: 0, display: '' },
+    lngDegrees: { value: 0, display: '' },
     score: { value: 0, display: '' }
   }
 
@@ -431,7 +439,9 @@ function renderMultiGuess(guess: Guess) {
       },
       distance: { value: guess.distance, display: toMeter(guess.distance) },
       latDistance: axisCell(guess.latDistance),
+      latDegrees: axisCell(guess.latDegrees, toDegrees),
       lngDistance: axisCell(guess.lngDistance),
+      lngDegrees: axisCell(guess.lngDegrees, toDegrees),
       score: { value: guess.score, display: `${guess.score}` },
       isRandomPlonk: guess.isRandomPlonk,
       brCounter: guess.brCounter
@@ -478,7 +488,9 @@ function restoreGuesses(restoredGuesses: RoundResult[]) {
       },
       distance: { value: guess.distance, display: toMeter(guess.distance) },
       latDistance: axisCell(guess.latDistance),
+      latDegrees: axisCell(guess.latDegrees, toDegrees),
       lngDistance: axisCell(guess.lngDistance),
+      lngDegrees: axisCell(guess.lngDegrees, toDegrees),
       score: { value: guess.score, display: guess.score },
       isRandomPlonk: guess.isRandomPlonk
     }
@@ -514,7 +526,9 @@ function showRoundResults(round: number, roundResults: RoundResult[]) {
             : toMeter(result.distance)
       },
       latDistance: axisCell(result.latDistance),
+      latDegrees: axisCell(result.latDegrees, toDegrees),
       lngDistance: axisCell(result.lngDistance),
+      lngDegrees: axisCell(result.lngDegrees, toDegrees),
       score: {
         value: result.score,
         display: result.score
@@ -551,7 +565,9 @@ function showGameResults(gameResults: GameResult[]) {
         display: toMeter(result.totalDistance)
       },
       latDistance: axisCell(result.totalLatDistance),
+      latDegrees: axisCell(result.totalLatDegrees, toDegrees),
       lngDistance: axisCell(result.totalLngDistance),
+      lngDegrees: axisCell(result.totalLngDegrees, toDegrees),
       score: {
         value: result.totalScore,
         display: `${result.totalScore} [${result.guesses.filter(Boolean).length}]`
@@ -661,15 +677,19 @@ function toMeter(distance: number) {
   return distance >= 1 ? distance.toFixed(1) + 'km' : Math.floor(distance * 1000) + 'm'
 }
 
+function toDegrees(degrees: number) {
+  return degrees.toFixed(2) + '°'
+}
+
 /**
- * Cell for a per-axis distance. Older guesses (restored from a game started
- * before this ran) carry no axis distance, so those render empty rather than
- * claiming a 0km miss.
+ * Cell for a per-axis miss (km or degrees). Older guesses (restored from a game
+ * started before this ran) carry no axis values, so those render empty rather
+ * than claiming a perfect guess.
  */
-function axisCell(distance?: number) {
-  return distance == null
+function axisCell(value?: number, format: (value: number) => string = toMeter) {
+  return value == null
     ? { value: Number.POSITIVE_INFINITY, display: '' }
-    : { value: distance, display: toMeter(distance) }
+    : { value, display: format(value) }
 }
 
 function highlightGuessMarkerByIndex(index: number) {

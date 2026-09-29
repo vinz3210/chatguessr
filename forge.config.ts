@@ -7,7 +7,11 @@ import { PublisherGithub } from '@electron-forge/publisher-github'
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      // sherpa-onnx.node loads onnxruntime.dll & co. from its own folder, so those files have to
+      // exist on disk rather than inside the archive.
+      unpack: '**/node_modules/sherpa-onnx-*/**'
+    },
     icon: 'build/icon',
     executableName: 'chatguessr'
   },
@@ -39,6 +43,11 @@ const config: ForgeConfig = {
         // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
         {
           entry: 'src/main/main.ts',
+          config: 'vite.main.config.ts'
+        },
+        // Runs in an Electron utility process so text-to-speech can't stall the main process.
+        {
+          entry: 'src/main/tts/ttsWorker.ts',
           config: 'vite.main.config.ts'
         },
         { entry: 'src/preload/preload.ts' },
