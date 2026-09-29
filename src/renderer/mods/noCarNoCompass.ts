@@ -8,7 +8,10 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
     water: false,
     scramble: false,
     rescramble: false,
+    tileReveal: false,
+    visibleTileCount: 10,
     rescrambleTime: 1000,
+    scrambleGridSize: 4,
     pixelate: false,
     pixelScale: 120,
     greyscale: false,
@@ -31,11 +34,29 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
   const restorePostProcessingSettings = () => {
     if (!window.ppController) return
 
+    settings.rescrambleTime = Math.max(100, Math.min(5000, Number(settings.rescrambleTime) || 1000))
+    settings.scrambleGridSize = [2, 3, 4, 5, 6, 7, 8].includes(Number(settings.scrambleGridSize))
+      ? Number(settings.scrambleGridSize)
+      : 4
+    const savedVisibleTileCount = Number(settings.visibleTileCount ?? 10)
+    settings.visibleTileCount = Number.isFinite(savedVisibleTileCount)
+      ? Math.max(0, Math.min(64, Math.round(savedVisibleTileCount)))
+      : 10
+    settings.tileReveal = Boolean(settings.tileReveal)
+    if (settings.tileReveal) {
+      settings.scramble = false
+      settings.rescramble = false
+    }
+
     Object.assign(window.pp, {
       hideCar: settings.noCar,
       water: settings.water,
-      scramble: settings.scramble,
-      rescramble: settings.rescramble,
+      scramble: settings.scramble && !settings.rescramble && !settings.tileReveal,
+      rescramble: settings.scramble && settings.rescramble,
+      tileReveal: settings.tileReveal,
+      rescrambleTime: settings.rescrambleTime,
+      scrambleGridSize: settings.scrambleGridSize,
+      visibleTileCount: Math.min(settings.visibleTileCount, settings.scrambleGridSize ** 2),
       pixelate: settings.pixelate,
       pixelScale: settings.pixelScale,
       toon: settings.toon,
@@ -48,7 +69,7 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
       window.ppController.updateState(window.pp)
     } catch {
       // Older saved settings can contain multiple mutually exclusive filters.
-      for (const key of ['water', 'scramble', 'rescramble', 'pixelate', 'crt', 'min']) {
+      for (const key of ['water', 'scramble', 'rescramble', 'tileReveal', 'pixelate', 'crt', 'min']) {
         settings[key] = false
         window.pp[key] = false
       }
@@ -69,26 +90,70 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
   }
   window.toggleScrambleMode = (el) => {
     settings.scramble = el.checked
+    if (!settings.scramble) settings.rescramble = false
+    if (settings.scramble) settings.tileReveal = false
     setLocalStorage('cg_ncnc__settings', settings)
     updateGui()
     if (window.ppController) {
       window.pp.scramble = settings.scramble
+      window.pp.rescramble = settings.rescramble
+      window.pp.tileReveal = settings.tileReveal
       window.ppController.updateState(window.pp)
     }
   }
   window.toggleRescrambleMode = (el) => {
-    settings.rescramble = el.checked
+    settings.rescramble = settings.scramble && el.checked
     setLocalStorage('cg_ncnc__settings', settings)
     if (window.ppController) {
+      window.pp.scramble = settings.scramble && !settings.rescramble
       window.pp.rescramble = settings.rescramble
       window.ppController.updateState(window.pp)
     }
   }
+  window.toggleTileRevealMode = (el) => {
+    settings.tileReveal = el.checked
+    if (settings.tileReveal) {
+      for (const key of ['water', 'scramble', 'rescramble', 'pixelate', 'crt', 'min']) {
+        settings[key] = false
+        if (window.pp) window.pp[key] = false
+      }
+    }
+    setLocalStorage('cg_ncnc__settings', settings)
+    updateGui()
+    if (window.ppController) {
+      window.pp.tileReveal = settings.tileReveal
+      window.pp.visibleTileCount = Math.min(settings.visibleTileCount, settings.scrambleGridSize ** 2)
+      window.ppController.updateState(window.pp)
+    }
+  }
   window.setRescrambleTime = (value) => {
-    settings.rescrambleTime = value
+    settings.rescrambleTime = Math.max(100, Math.min(5000, Number(value) || 1000))
     setLocalStorage('cg_ncnc__settings', settings)
     if (window.ppController) {
       window.pp.rescrambleTime = settings.rescrambleTime
+      window.ppController.updateState(window.pp)
+    }
+  }
+  window.setScrambleGridSize = (value) => {
+    const gridSize = Number(value)
+    if (![2, 3, 4, 5, 6, 7, 8].includes(gridSize)) return
+    settings.scrambleGridSize = gridSize
+    setLocalStorage('cg_ncnc__settings', settings)
+    if (window.ppController) {
+      window.pp.scrambleGridSize = gridSize
+      window.pp.visibleTileCount = Math.min(settings.visibleTileCount, gridSize ** 2)
+      window.ppController.updateState(window.pp)
+    }
+    updateGui()
+  }
+  window.setVisibleTileCount = (value) => {
+    settings.visibleTileCount = Math.max(
+      0,
+      Math.min(settings.scrambleGridSize ** 2, Math.round(Number(value) || 0))
+    )
+    setLocalStorage('cg_ncnc__settings', settings)
+    if (window.ppController) {
+      window.pp.visibleTileCount = settings.visibleTileCount
       window.ppController.updateState(window.pp)
     }
   }
@@ -251,16 +316,41 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
         </div>
       </div>
 
+      <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+        <span class="game-options_optionLabel" style="margin: 0; padding-right: 6px;">Scramble tiles</span>
+        <select id="scrambleGridSize" onchange="window.setScrambleGridSize && window.setScrambleGridSize(this.value)">
+          <option value="2" ${settings.scrambleGridSize === 2 ? 'selected' : ''}>2×2 (4)</option>
+          <option value="3" ${settings.scrambleGridSize === 3 ? 'selected' : ''}>3×3 (9)</option>
+          <option value="4" ${settings.scrambleGridSize === 4 || !settings.scrambleGridSize ? 'selected' : ''}>4×4 (16)</option>
+          <option value="5" ${settings.scrambleGridSize === 5 ? 'selected' : ''}>5×5 (25)</option>
+          <option value="6" ${settings.scrambleGridSize === 6 ? 'selected' : ''}>6×6 (36)</option>
+          <option value="7" ${settings.scrambleGridSize === 7 ? 'selected' : ''}>7×7 (49)</option>
+          <option value="8" ${settings.scrambleGridSize === 8 ? 'selected' : ''}>8×8 (64)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 8px;">
+        <div style="display: flex; align-items: center;">
+          <span class="game-options_optionLabel" style="margin: 0; padding-right: 6px;">Tile reveal</span>
+          <input type="checkbox" id="enableTileRevealMode" onclick="toggleTileRevealMode(this)" class="toggle_toggle">
+        </div>
+        ${settings.tileReveal ? `<div style="display: flex; align-items: center; gap: 6px;">
+          <span class="game-options_optionLabel" style="margin: 0; padding-right: 6px;">Visible tiles</span>
+          <input type="range" id="visibleTileCountSlider" style="width: 120px;" min="0" max="${settings.scrambleGridSize ** 2}" step="1" value="${Math.min(settings.visibleTileCount, settings.scrambleGridSize ** 2)}" oninput="document.getElementById('visibleTileCountValue').textContent=this.value; window.setVisibleTileCount && window.setVisibleTileCount(this.value)">
+          <span id="visibleTileCountValue">${Math.min(settings.visibleTileCount, settings.scrambleGridSize ** 2)}</span>
+        </div>` : ''}
+      </div>
+
       ${
         settings.scramble
-        ? `<div style="display: flex; justify-content: space-between">
+        ? `<div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;">
           <div style="display: flex; align-items: center;">
             <span class="game-options_optionLabel" style="margin: 0; padding-right: 6px;">Rescramble</span>
             <input type="checkbox" id="enableRescrambleMode" onclick="toggleRescrambleMode(this)" class="toggle_toggle">
           </div>
-          <div style="display: flex; align-items: center; margin-left: 16px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
             <span class="game-options_optionLabel" style="margin: 0; padding-right: 6px;">Rescramble ms</span>
-            <input type="range" id="rescrambleTimeSlider" min="100" max="5000" step="100" value="${settings.rescrambleTime ?? 1000}" oninput="document.getElementById('rescrambleTimeValue').textContent=this.value; window.setRescrambleTime && window.setRescrambleTime(this.value)">
+            <input type="range" id="rescrambleTimeSlider" style="width: 120px;" min="100" max="5000" step="100" value="${settings.rescrambleTime ?? 1000}" oninput="document.getElementById('rescrambleTimeValue').textContent=this.value; window.setRescrambleTime && window.setRescrambleTime(this.value)">
             <span id="rescrambleTimeValue">${settings.rescrambleTime ?? 1000}</span>
           </div>
           </div>`
@@ -301,6 +391,9 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
       if (document.querySelector('#enableRescrambleMode')) {
         (document.querySelector('#enableRescrambleMode') as HTMLInputElement).checked = true;
       }
+    }
+    if (settings.tileReveal) {
+      (document.querySelector('#enableTileRevealMode') as HTMLInputElement).checked = true;
     }
     if (settings.pixelate) {
       (document.querySelector('#enablePixelateMode') as HTMLInputElement).checked = true;
@@ -343,6 +436,9 @@ import { getLocalStorage, setLocalStorage } from '../useLocalStorage'
       }
       if (settings.scramble) {
         ;(document.querySelector('#enableScrambleMode') as HTMLInputElement).checked = true
+      }
+      if (settings.tileReveal) {
+        ;(document.querySelector('#enableTileRevealMode') as HTMLInputElement).checked = true
       }
       if (settings.pixelate) {
         ;(document.querySelector('#enablePixelateMode') as HTMLInputElement).checked = true

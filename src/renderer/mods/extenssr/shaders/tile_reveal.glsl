@@ -1,0 +1,80 @@
+vec3 tileRevealFunc()
+{
+    int numCols = int(scrambleGridSize);
+    int x = int(vTexCoord.x * scrambleGridSize);
+    int y = int(vTexCoord.y * scrambleGridSize);
+    if (x >= numCols) x = numCols - 1;
+    if (y >= numCols) y = numCols - 1;
+
+    int tileIndex = y * numCols + x;
+    int rank = 0;
+    if (tileIndex == 0) rank = scrambled[0];
+    if (tileIndex == 1) rank = scrambled[1];
+    if (tileIndex == 2) rank = scrambled[2];
+    if (tileIndex == 3) rank = scrambled[3];
+    if (tileIndex == 4) rank = scrambled[4];
+    if (tileIndex == 5) rank = scrambled[5];
+    if (tileIndex == 6) rank = scrambled[6];
+    if (tileIndex == 7) rank = scrambled[7];
+    if (tileIndex == 8) rank = scrambled[8];
+    if (tileIndex == 9) rank = scrambled[9];
+    if (tileIndex == 10) rank = scrambled[10];
+    if (tileIndex == 11) rank = scrambled[11];
+    if (tileIndex == 12) rank = scrambled[12];
+    if (tileIndex == 13) rank = scrambled[13];
+    if (tileIndex == 14) rank = scrambled[14];
+    if (tileIndex == 15) rank = scrambled[15];
+    if (tileIndex == 16) rank = scrambled[16];
+    if (tileIndex == 17) rank = scrambled[17];
+    if (tileIndex == 18) rank = scrambled[18];
+    if (tileIndex == 19) rank = scrambled[19];
+    if (tileIndex == 20) rank = scrambled[20];
+    if (tileIndex == 21) rank = scrambled[21];
+    if (tileIndex == 22) rank = scrambled[22];
+    if (tileIndex == 23) rank = scrambled[23];
+    if (tileIndex == 24) rank = scrambled[24];
+    if (tileIndex == 25) rank = scrambled[25];
+    if (tileIndex == 26) rank = scrambled[26];
+    if (tileIndex == 27) rank = scrambled[27];
+    if (tileIndex == 28) rank = scrambled[28];
+    if (tileIndex == 29) rank = scrambled[29];
+    if (tileIndex == 30) rank = scrambled[30];
+    if (tileIndex == 31) rank = scrambled[31];
+    if (tileIndex == 32) rank = scrambled[32];
+    if (tileIndex == 33) rank = scrambled[33];
+    if (tileIndex == 34) rank = scrambled[34];
+    if (tileIndex == 35) rank = scrambled[35];
+    if (tileIndex == 36) rank = scrambled[36];
+    if (tileIndex == 37) rank = scrambled[37];
+    if (tileIndex == 38) rank = scrambled[38];
+    if (tileIndex == 39) rank = scrambled[39];
+    if (tileIndex == 40) rank = scrambled[40];
+    if (tileIndex == 41) rank = scrambled[41];
+    if (tileIndex == 42) rank = scrambled[42];
+    if (tileIndex == 43) rank = scrambled[43];
+    if (tileIndex == 44) rank = scrambled[44];
+    if (tileIndex == 45) rank = scrambled[45];
+    if (tileIndex == 46) rank = scrambled[46];
+    if (tileIndex == 47) rank = scrambled[47];
+    if (tileIndex == 48) rank = scrambled[48];
+    if (tileIndex == 49) rank = scrambled[49];
+    if (tileIndex == 50) rank = scrambled[50];
+    if (tileIndex == 51) rank = scrambled[51];
+    if (tileIndex == 52) rank = scrambled[52];
+    if (tileIndex == 53) rank = scrambled[53];
+    if (tileIndex == 54) rank = scrambled[54];
+    if (tileIndex == 55) rank = scrambled[55];
+    if (tileIndex == 56) rank = scrambled[56];
+    if (tileIndex == 57) rank = scrambled[57];
+    if (tileIndex == 58) rank = scrambled[58];
+    if (tileIndex == 59) rank = scrambled[59];
+    if (tileIndex == 60) rank = scrambled[60];
+    if (tileIndex == 61) rank = scrambled[61];
+    if (tileIndex == 62) rank = scrambled[62];
+    if (tileIndex == 63) rank = scrambled[63];
+
+    if (float(rank) < visibleTileCount) {
+        return texture2D(texture, vTexCoord).rgb;
+    }
+    return vec3(0.0);
+}

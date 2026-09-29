@@ -39,6 +39,7 @@ interface Guess {
   /** Longitude difference in degrees, shown when a lat/lng scoring mode is active. */
   lngDegrees?: number
   score: number
+  progressiveZoomTimeMs?: number | null
   modified?: boolean
   isRandomPlonk?: boolean
   brCounter?: number
@@ -58,6 +59,7 @@ interface RoundResult {
   totalScore: number
   isRandomPlonk: boolean
   time: number
+  progressiveZoomTimeMs?: number | null
   position: LatLng
 }
 
@@ -115,6 +117,10 @@ interface ScoreboardRow {
   score?: {
     value: number
     display: number | string
+  }
+  progressiveZoomTime?: {
+    value: number
+    display: string
   }
   modified?: boolean
   isRandomPlonk?: boolean

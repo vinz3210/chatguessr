@@ -9,6 +9,7 @@ import toonString from './shaders/toon.glsl?raw';
 import minString from './shaders/min.glsl?raw';
 import motionString from './shaders/motion_blur.glsl?raw';
 import scrambleString from './shaders/scramble.glsl?raw';
+import tileRevealString from './shaders/tile_reveal.glsl?raw';
 import snowString from './shaders/snow.glsl?raw';
 import sobelString from './shaders/sobel.glsl?raw';
 import vignetteString from './shaders/vignette.glsl?raw';
@@ -24,6 +25,7 @@ const mutuallyExclusiveShaderToggles = [
 	'motion_blur',
 	'scramble',
 	'rescramble',
+	'tileReveal',
 	'water'
 ] as const;
 const regularShaderToggles = ['bloom', 'toon', 'snow', 'sobel', 'vignette'] as const;
@@ -43,6 +45,9 @@ export type PostProcessingState = {
 	[key in SliderTypes]: number;
 } & {
 	scrambleState: number[];
+	scrambleGridSize: number;
+	rescrambleTime: number;
+	visibleTileCount: number;
 };
 
 type Effect = {
@@ -96,7 +101,12 @@ const effects: Record<ShaderToggleTypes, Effect> = {
 				name: 'scrambled',
 				type: UniformType.INTVEC,
 				value: state.scrambleState.slice(),
-				vecSize: 16
+				vecSize: 64
+			});
+			knownUniforms.set('scrambleGridSize', {
+				name: 'scrambleGridSize',
+				type: UniformType.FLOAT,
+				value: [state.scrambleGridSize]
 			});
 		}
 	},
@@ -107,10 +117,37 @@ const effects: Record<ShaderToggleTypes, Effect> = {
 				name: 'scrambled',
 				type: UniformType.INTVEC,
 				value: state.scrambleState.slice(),
-				vecSize: 16
+				vecSize: 64
+			});
+			knownUniforms.set('scrambleGridSize', {
+				name: 'scrambleGridSize',
+				type: UniformType.FLOAT,
+				value: [state.scrambleGridSize]
 			});
 		}
-	},	snow: {
+	},
+	tileReveal: {
+		shaderPass: ShaderPass.fromString(tileRevealString) as ShaderPass,
+		updateKnownUniforms: (state, knownUniforms) => {
+			knownUniforms.set('scrambled', {
+				name: 'scrambled',
+				type: UniformType.INTVEC,
+				value: state.scrambleState.slice(),
+				vecSize: 64
+			});
+			knownUniforms.set('scrambleGridSize', {
+				name: 'scrambleGridSize',
+				type: UniformType.FLOAT,
+				value: [state.scrambleGridSize]
+			});
+			knownUniforms.set('visibleTileCount', {
+				name: 'visibleTileCount',
+				type: UniformType.FLOAT,
+				value: [state.visibleTileCount]
+			});
+		}
+	},
+	snow: {
 		shaderPass: ShaderPass.fromString(snowString) as ShaderPass
 	},
 	sobel: {
@@ -135,6 +172,13 @@ function shuffleArray(arr: number[]) {
 	return arr;
 }
 
+function createScrambleState(gridSize: number) {
+	const state = [...Array(64).keys()];
+	const tileCount = gridSize * gridSize;
+	state.splice(0, tileCount, ...shuffleArray(state.slice(0, tileCount)));
+	return state;
+}
+
 export function defaultPP(): PostProcessingState {
 	return {
 		bloom: false,
@@ -150,7 +194,11 @@ export function defaultPP(): PostProcessingState {
 		motion_blur: false,
 		scramble: false,
 		rescramble: false,
-		scrambleState: shuffleArray([...Array(16).keys()]),
+		tileReveal: false,
+		scrambleGridSize: 4,
+		rescrambleTime: 1000,
+		visibleTileCount: 10,
+		scrambleState: createScrambleState(4),
 		snow: false,
 		sobel: false,
 		vignette: false,
@@ -162,11 +210,13 @@ export default class PostProcessingController {
 	handler: PostprocessHandler | null;
 	streetView: google.maps.StreetViewPanorama | null;
 	scrambleTimer: number | null;
+	scrambleTimerInterval: number | null;
 	constructor() {
 		this.state = defaultPP();
 		this.handler = null;
 		this.streetView = null;
 		this.scrambleTimer = null;
+		this.scrambleTimerInterval = null;
 	}
 	setHandler(handler: PostprocessHandler) {
 		this.handler = handler;
@@ -223,33 +273,36 @@ export default class PostProcessingController {
 	}
 	updateState(newState: PostProcessingState) {
 		this.fixupStateBeforeSet(newState);
-		// get rescrambleWasEnabled directly from the ui element
-		
-		const rescrambleElement = document.querySelector('#enableRescrambleMode') as HTMLInputElement;
-
-		if (rescrambleElement?.checked) {
-			// Start timer
-			this.startScrambleTimer();
-		} else{
-			// Stop timer
-			this.stopScrambleTimer();
+		newState.scrambleGridSize = [2, 3, 4, 5, 6, 7, 8].includes(Number(newState.scrambleGridSize))
+			? Number(newState.scrambleGridSize)
+			: 4;
+		newState.rescrambleTime = Math.max(100, Math.min(5000, Number(newState.rescrambleTime) || 1000));
+		newState.visibleTileCount = Math.max(
+			0,
+			Math.min(newState.scrambleGridSize * newState.scrambleGridSize, Number(newState.visibleTileCount) || 0)
+		);
+		if (newState.scrambleGridSize !== this.state.scrambleGridSize || (newState.tileReveal && !this.state.tileReveal)) {
+			newState.scrambleState = createScrambleState(newState.scrambleGridSize);
 		}
-		console.log("newstate", newState)
 		this.state = Object.assign(this.state, newState);
+		if (this.state.rescramble) this.startScrambleTimer();
+		else this.stopScrambleTimer();
 		this.passShaderInfoAndUniforms();
 
 
 	}
 
 	startScrambleTimer() {
-		if (this.scrambleTimer !== null) return;
+		if (this.scrambleTimer !== null && this.scrambleTimerInterval === this.state.rescrambleTime) return;
+		this.stopScrambleTimer();
+		this.scrambleTimerInterval = this.state.rescrambleTime;
 		this.scrambleTimer = window.setInterval(() => {
 			if (this.state.rescramble) {
 				this.rescramble();
 			} else {
 				this.stopScrambleTimer();
 			}
-		}, 1000);
+		}, this.state.rescrambleTime);
 	}
 
 	stopScrambleTimer() {
@@ -257,6 +310,7 @@ export default class PostProcessingController {
 			clearInterval(this.scrambleTimer);
 			this.scrambleTimer = null;
 		}
+		this.scrambleTimerInterval = null;
 	}
 	passShaderInfoAndUniforms() {
 		let shaderInfo = this.assemblePasses() as ShaderInfo;
@@ -266,7 +320,12 @@ export default class PostProcessingController {
 		}
 	}
 	rescramble() {
-		this.state.scrambleState = shuffleArray(this.state.scrambleState);
+		this.state.scrambleState = createScrambleState(this.state.scrambleGridSize);
+		this.passShaderInfoAndUniforms();
+	}
+	reshuffleTileReveal() {
+		if (!this.state.tileReveal) return;
+		this.state.scrambleState = createScrambleState(this.state.scrambleGridSize);
 		this.passShaderInfoAndUniforms();
 	}
 	setupStreetView(streetView: google.maps.StreetViewPanorama) {

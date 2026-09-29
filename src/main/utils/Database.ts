@@ -222,6 +222,9 @@ const customMigrations: ((db: SQLite.Database) => void)[] = [
     } catch (err) {
       // If the column already exists or SQLite doesn't support ALTER in this context, ignore the error.
     }
+  },
+  function addProgressiveZoomGuessTime(db) {
+    db.prepare(`ALTER TABLE guesses ADD COLUMN progressive_zoom_time_ms INTEGER DEFAULT NULL`).run()
   }
 ]
 
@@ -431,12 +434,13 @@ class db {
       distance: number
       score: number,
       isRandomPlonk: number | null
+      progressiveZoomTimeMs?: number | null
     }
   ) {
     const id = randomUUID()
     const insertGuess = this.#db.prepare(`
-      INSERT INTO guesses(id, round_id, user_id, location, country, streak, last_streak, distance, score, created_at, is_random_plonk)
-      VALUES (:id, :roundId, :userId, :location, :streakCode, :streak, :lastStreak, :distance, :score, :createdAt, :isRandomPlonk)
+      INSERT INTO guesses(id, round_id, user_id, location, country, streak, last_streak, distance, score, created_at, is_random_plonk, progressive_zoom_time_ms)
+      VALUES (:id, :roundId, :userId, :location, :streakCode, :streak, :lastStreak, :distance, :score, :createdAt, :isRandomPlonk, :progressiveZoomTimeMs)
     `)
 
     insertGuess.run({
@@ -450,7 +454,8 @@ class db {
       distance: guess.distance,
       score: guess.score,
       createdAt: timestamp(),
-      isRandomPlonk: guess.isRandomPlonk
+      isRandomPlonk: guess.isRandomPlonk,
+      progressiveZoomTimeMs: guess.progressiveZoomTimeMs ?? null
     })
 
     return id
@@ -510,6 +515,7 @@ class db {
       distance: number
       score: number,
       isRandomPlonk: number | null
+      progressiveZoomTimeMs?: number | null
     }
   ) {
     const updateGuess = this.#db.prepare(`
@@ -520,6 +526,7 @@ class db {
         streak = :streak,
         last_streak = :lastStreak,
         is_random_plonk = :isRandomPlonk,
+        progressive_zoom_time_ms = :progressiveZoomTimeMs,
         distance = :distance,
         score = :score,
         created_at = :updatedAt
@@ -533,6 +540,7 @@ class db {
       streak: guess.streak,
       lastStreak: guess.lastStreak,
       isRandomPlonk: guess.isRandomPlonk,
+      progressiveZoomTimeMs: guess.progressiveZoomTimeMs ?? null,
       distance: guess.distance,
       score: guess.score,
       updatedAt: timestamp()
@@ -712,6 +720,7 @@ SELECT
     guesses.is_random_plonk,
     guesses.distance,
     guesses.score,
+    guesses.progressive_zoom_time_ms,
     guesses.created_at - rounds.created_at AS time,
     IIF(guesses.score = 5000, guesses.created_at - rounds.created_at, NULL) AS time_to_5k,
     total_scores.total_score
@@ -748,6 +757,7 @@ ORDER BY
       is_random_plonk: number | null
       distance: number
       score: number
+      progressive_zoom_time_ms: number | null
       time: number
       total_score: number
     }[]
@@ -767,6 +777,7 @@ ORDER BY
       isRandomPlonk: record.is_random_plonk?.valueOf() === 1,
       distance: record.distance,
       score: record.score,
+      progressiveZoomTimeMs: record.progressive_zoom_time_ms,
       totalScore: record.total_score,
       time: record.time,
       position: JSON.parse(record.location) as LatLng

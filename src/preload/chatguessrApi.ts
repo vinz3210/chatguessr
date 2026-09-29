@@ -33,6 +33,12 @@ export const chatguessrApi = {
   saveSettings(settings: Settings) {
     ipcRenderer.send('save-settings', settings)
   },
+  startProgressiveZoomRound(timeLimit: number, panoramaReadyAt?: number): Promise<{ startedAt: number; durationMs: number } | null> {
+    return ipcRenderer.invoke('start-progressive-zoom-round', timeLimit, panoramaReadyAt)
+  },
+  onProgressiveZoomLoading(callback: () => void) {
+    return ipcRendererOn('progressive-zoom-loading', callback)
+  },
 
   getGlobalStats(sinceTime: StatisticsInterval): Promise<Statistics> {
     return ipcRenderer.invoke('get-global-stats', sinceTime)
@@ -231,6 +237,14 @@ export const chatguessrApi = {
   onZoomOut(callback: (value) => void) {
     return ipcRendererOn('zoom-out', callback)
   },
+  onResetView(
+    callback: (location: Location_, canMove: boolean, canRotate: boolean, canZoom: boolean) => void
+  ) {
+    return ipcRendererOn('reset-view', callback)
+  },
+  onMovePeephole(callback: (direction: 'up' | 'down' | 'left' | 'right' | 'center') => void) {
+    return ipcRendererOn('move-peephole', callback)
+  },
   onRetrieveMyLastLoc(callback: (location: Location_, username:string, locationNumber: number) => void) {
     return ipcRendererOn('retrieve-my-last-loc', callback)
   },
@@ -249,7 +263,7 @@ export const chatguessrApi = {
     return ipcRendererOn('show-game-results', callback)
   },
 
-  onStartRound(callback: (location: Location_) => void) {
+  onStartRound(callback: (isMultiGuess: boolean, location: Location_) => void) {
     return ipcRendererOn('next-round', callback)
   },
 

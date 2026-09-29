@@ -1,14 +1,16 @@
 vec3 scrambleFunc()
 {
-    const int NUM_ROWS = 4;
-    const int NUM_COLS = 4;
+    int numRows = int(scrambleGridSize);
+    int numCols = int(scrambleGridSize);
 
-    int x = int(vTexCoord.x * float(NUM_COLS));
-    int y = int(vTexCoord.y * float(NUM_ROWS));
+    int x = int(vTexCoord.x * scrambleGridSize);
+    int y = int(vTexCoord.y * scrambleGridSize);
+    if (x >= numCols) x = numCols - 1;
+    if (y >= numRows) y = numRows - 1;
 
-    float dx = mod(vTexCoord.x, 1.0 / float(NUM_COLS));
-    float dy = mod(vTexCoord.y, 1.0 / float(NUM_ROWS));
-    int oldIdx = y * NUM_COLS + x;
+    float dx = mod(vTexCoord.x, 1.0 / scrambleGridSize);
+    float dy = mod(vTexCoord.y, 1.0 / scrambleGridSize);
+    int oldIdx = y * numCols + x;
     int newIdx = 0;
     if (oldIdx == 0) newIdx = scrambled[0];
     if (oldIdx == 1) newIdx = scrambled[1];
@@ -26,10 +28,58 @@ vec3 scrambleFunc()
     if (oldIdx == 13) newIdx = scrambled[13];
     if (oldIdx == 14) newIdx = scrambled[14];
     if (oldIdx == 15) newIdx = scrambled[15];
+    if (oldIdx == 16) newIdx = scrambled[16];
+    if (oldIdx == 17) newIdx = scrambled[17];
+    if (oldIdx == 18) newIdx = scrambled[18];
+    if (oldIdx == 19) newIdx = scrambled[19];
+    if (oldIdx == 20) newIdx = scrambled[20];
+    if (oldIdx == 21) newIdx = scrambled[21];
+    if (oldIdx == 22) newIdx = scrambled[22];
+    if (oldIdx == 23) newIdx = scrambled[23];
+    if (oldIdx == 24) newIdx = scrambled[24];
+    if (oldIdx == 25) newIdx = scrambled[25];
+    if (oldIdx == 26) newIdx = scrambled[26];
+    if (oldIdx == 27) newIdx = scrambled[27];
+    if (oldIdx == 28) newIdx = scrambled[28];
+    if (oldIdx == 29) newIdx = scrambled[29];
+    if (oldIdx == 30) newIdx = scrambled[30];
+    if (oldIdx == 31) newIdx = scrambled[31];
+    if (oldIdx == 32) newIdx = scrambled[32];
+    if (oldIdx == 33) newIdx = scrambled[33];
+    if (oldIdx == 34) newIdx = scrambled[34];
+    if (oldIdx == 35) newIdx = scrambled[35];
+    if (oldIdx == 36) newIdx = scrambled[36];
+    if (oldIdx == 37) newIdx = scrambled[37];
+    if (oldIdx == 38) newIdx = scrambled[38];
+    if (oldIdx == 39) newIdx = scrambled[39];
+    if (oldIdx == 40) newIdx = scrambled[40];
+    if (oldIdx == 41) newIdx = scrambled[41];
+    if (oldIdx == 42) newIdx = scrambled[42];
+    if (oldIdx == 43) newIdx = scrambled[43];
+    if (oldIdx == 44) newIdx = scrambled[44];
+    if (oldIdx == 45) newIdx = scrambled[45];
+    if (oldIdx == 46) newIdx = scrambled[46];
+    if (oldIdx == 47) newIdx = scrambled[47];
+    if (oldIdx == 48) newIdx = scrambled[48];
+    if (oldIdx == 49) newIdx = scrambled[49];
+    if (oldIdx == 50) newIdx = scrambled[50];
+    if (oldIdx == 51) newIdx = scrambled[51];
+    if (oldIdx == 52) newIdx = scrambled[52];
+    if (oldIdx == 53) newIdx = scrambled[53];
+    if (oldIdx == 54) newIdx = scrambled[54];
+    if (oldIdx == 55) newIdx = scrambled[55];
+    if (oldIdx == 56) newIdx = scrambled[56];
+    if (oldIdx == 57) newIdx = scrambled[57];
+    if (oldIdx == 58) newIdx = scrambled[58];
+    if (oldIdx == 59) newIdx = scrambled[59];
+    if (oldIdx == 60) newIdx = scrambled[60];
+    if (oldIdx == 61) newIdx = scrambled[61];
+    if (oldIdx == 62) newIdx = scrambled[62];
+    if (oldIdx == 63) newIdx = scrambled[63];
 
-    y = newIdx / NUM_COLS;
-    x = newIdx - (NUM_COLS * y);
-    float u = (float(x) / float(NUM_COLS)) + dx;
-    float v = (float(y) / float(NUM_ROWS)) + dy;
+    y = newIdx / numCols;
+    x = newIdx - (numCols * y);
+    float u = (float(x) / scrambleGridSize) + dx;
+    float v = (float(y) / scrambleGridSize) + dy;
     return texture2D(texture, vec2(u, v)).rgb;
 }

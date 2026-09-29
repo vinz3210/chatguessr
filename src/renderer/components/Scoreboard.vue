@@ -68,6 +68,9 @@
         </label>
       </div>
     </div>
+    <div v-if="progressiveZoomEnabled && gameState === 'in-round'" class="scoreboard-hint">
+      Time left: {{ progressiveZoomRound ? formatRemainingTime(timeRemainingMs) : 'Waiting for panorama…' }}
+    </div>
     <div :class="['scoreboard-hint', { hidden: !isMultiGuess || gameState !== 'in-round' }]">
       Guess change allowed
     </div>
@@ -216,6 +219,8 @@ const props = defineProps<{
   isBRMode: boolean
   modeHelp: string[]
   scoringMode: ScoringMode
+  progressiveZoomEnabled: boolean
+  progressiveZoomRound: { startedAt: number; durationMs: number } | null
   onRoundResultRowClick: (index: number, position: LatLng) => void
   onGameResultRowClick: (row: GameResultDisplay) => void
 }>()
@@ -224,6 +229,11 @@ const isDraggable = shallowRef(true)
 const isColumnVisibilityOpen = shallowRef(false)
 const title = shallowRef('GUESSES')
 const switchState = shallowRef(true)
+const now = shallowRef(Date.now())
+useIntervalFn(() => { now.value = Date.now() }, 250)
+const timeRemainingMs = computed(() => props.progressiveZoomRound
+  ? Math.max(0, props.progressiveZoomRound.durationMs - (now.value - props.progressiveZoomRound.startedAt))
+  : 0)
 
 const defaultPosition = { x: 20, y: 50, w: 340, h: 390 }
 const position = shallowReactive(defaultPosition)
@@ -309,6 +319,7 @@ const round_columns: Column[] = [
   { name: 'Lat°', value: 'latDegrees', width: '58px', sortable: true },
   { name: 'Lng°', value: 'lngDegrees', width: '58px', sortable: true },
   { name: 'Score', value: 'score', width: '65px', sortable: true },
+  { name: 'Guess time', value: 'progressiveZoomTime', width: '85px', sortable: true },
   { name: 'Total', value: 'totalScore', width: '65px', sortable: true }
 ]
 const end_columns: Column[] = [
@@ -324,6 +335,7 @@ const end_columns: Column[] = [
 ]
 
 const playerColumn = round_columns.find((col) => col.value === 'player')!
+const progressiveZoomTimeColumn = round_columns.find((col) => col.value === 'progressiveZoomTime')!
 
 function colName(value: string) {
   return round_columns.find((col) => col.value === value)!.name
@@ -355,12 +367,14 @@ function isAxisColumnVisible(value: string) {
 const activeRoundCols = computed(() =>
   props.gameState === 'in-round'
     ? (props.isMultiGuess && !props.isBRMode)
-      ? [playerColumn]
+      ? props.progressiveZoomEnabled ? [playerColumn, progressiveZoomTimeColumn] : [playerColumn]
       : round_columns.filter(
-          (f) => f.value === 'index' || f.value === 'player' || ( isAxisColumnVisible(f.value) && settings[f.value] === true && f.value !== 'totalScore' )
+          (f) => f.value === 'index' || f.value === 'player' || (f.value === 'progressiveZoomTime' && props.progressiveZoomEnabled) || ( isAxisColumnVisible(f.value) && settings[f.value] === true && f.value !== 'totalScore' )
         )
     : round_columns.filter(
-          (f) => isAxisColumnVisible(f.value) && (f.value !== 'totalScore' || settings['totalScore'] === true)
+          (f) => f.value === 'progressiveZoomTime'
+            ? props.progressiveZoomEnabled
+            : isAxisColumnVisible(f.value) && (f.value !== 'totalScore' || settings['totalScore'] === true)
         )
 )
 const activeEndCols = computed(() =>
@@ -398,6 +412,7 @@ function renderGuess(guess: Guess) {
     lngDistance: axisCell(guess.lngDistance),
     lngDegrees: axisCell(guess.lngDegrees, toDegrees),
     score: { value: guess.score, display: guess.score },
+    progressiveZoomTime: timeCell(guess.progressiveZoomTimeMs),
     isRandomPlonk: guess.isRandomPlonk,
     modified: guess.modified,
     brCounter: guess.brCounter
@@ -424,7 +439,8 @@ function renderMultiGuess(guess: Guess) {
     lngDistance: { value: 0, display: '' },
     latDegrees: { value: 0, display: '' },
     lngDegrees: { value: 0, display: '' },
-    score: { value: 0, display: '' }
+    score: { value: 0, display: '' },
+    progressiveZoomTime: timeCell(guess.progressiveZoomTimeMs)
   }
 
   if (props.isBRMode) {
@@ -443,6 +459,7 @@ function renderMultiGuess(guess: Guess) {
       lngDistance: axisCell(guess.lngDistance),
       lngDegrees: axisCell(guess.lngDegrees, toDegrees),
       score: { value: guess.score, display: `${guess.score}` },
+      progressiveZoomTime: timeCell(guess.progressiveZoomTimeMs),
       isRandomPlonk: guess.isRandomPlonk,
       brCounter: guess.brCounter
     }
@@ -492,6 +509,7 @@ function restoreGuesses(restoredGuesses: RoundResult[]) {
       lngDistance: axisCell(guess.lngDistance),
       lngDegrees: axisCell(guess.lngDegrees, toDegrees),
       score: { value: guess.score, display: guess.score },
+      progressiveZoomTime: timeCell(guess.progressiveZoomTimeMs),
       isRandomPlonk: guess.isRandomPlonk
     }
   })
@@ -500,7 +518,7 @@ function restoreGuesses(restoredGuesses: RoundResult[]) {
 
 function restoreMultiGuesses(players: Player[]) {
   const formatedRows = players.map((player) => {
-    return { player: player }
+    return { player: player, progressiveZoomTime: timeCell(null) }
   })
   Object.assign(rows, formatedRows)
 }
@@ -533,6 +551,7 @@ function showRoundResults(round: number, roundResults: RoundResult[]) {
         value: result.score,
         display: result.score
       },
+      progressiveZoomTime: timeCell(result.progressiveZoomTimeMs),
       totalScore:{
         value: result.totalScore,
         display: result.totalScore
@@ -675,6 +694,22 @@ function setSwitchState(state: boolean) {
 
 function toMeter(distance: number) {
   return distance >= 1 ? distance.toFixed(1) + 'km' : Math.floor(distance * 1000) + 'm'
+}
+
+function formatGuessTime(milliseconds: number) {
+  const tenths = Math.floor(Math.max(0, milliseconds) / 100)
+  const minutes = Math.floor(tenths / 600)
+  const seconds = Math.floor(tenths % 600 / 10)
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${tenths % 10}`
+}
+
+function formatRemainingTime(milliseconds: number) {
+  const secondsLeft = Math.ceil(milliseconds / 1000)
+  return `${Math.floor(secondsLeft / 60).toString().padStart(2, '0')}:${(secondsLeft % 60).toString().padStart(2, '0')}`
+}
+
+function timeCell(milliseconds?: number | null) {
+  return { value: milliseconds ?? Number.POSITIVE_INFINITY, display: milliseconds == null ? '—' : formatGuessTime(milliseconds) }
 }
 
 function toDegrees(degrees: number) {

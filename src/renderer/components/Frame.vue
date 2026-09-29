@@ -1,5 +1,14 @@
 <template>
-  <div :class="['cg-frame-container', { hidden: gameState === 'none' }]">
+  <div :class="['cg-frame-container', { hidden: gameState === 'none', 'peephole-active': peepholeVisible }]">
+    <div
+      v-if="peepholeVisible"
+      class="cg-peephole-mask"
+      :style="{
+        '--peephole-x': `${peepholeX}%`,
+        '--peephole-y': `${peepholeY}%`,
+        '--peephole-radius': `${peepholeRadius}vmin`
+      }"
+    />
     <transition name="scoreboard_modal">
       <div v-show="widgetVisibility.scoreboardAndGgInterfaceVisible" style="position: absolute; z-index: 24;">
         <Scoreboard
@@ -9,6 +18,8 @@
           :is-b-r-mode
           :mode-help
           :scoring-mode
+          :progressive-zoom-enabled
+          :progressive-zoom-round
           :on-round-result-row-click
           :on-game-result-row-click
         />
@@ -27,7 +38,7 @@
     />
   </div>
 
-  <div class="cg-menu">
+  <div :class="['cg-menu', { 'peephole-active': peepholeVisible }]">
     <button
       :class="['cg-button', twitchConnectionState.state]"
       title="Settings"
@@ -99,7 +110,12 @@
 
   <Suspense>
     <Modal :is-visible="settingsVisible" @close="settingsVisible = false">
-      <Settings :socket-connection-state :twitch-connection-state />
+      <Settings
+        :socket-connection-state
+        :twitch-connection-state
+        @peephole-settings-change="onPeepholeSettingsChange"
+        @progressive-zoom-settings-change="onProgressiveZoomSettingsChange"
+      />
     </Modal>
   </Suspense>
 
@@ -133,6 +149,8 @@ import IconScoreboardHidden from '@/assets/icons/scoreboard_hidden.svg'
 import IconStartFlag from '@/assets/icons/start_flag.svg'
 import IconEyeShut from '@/assets/icons/eye_shut.svg'
 import { rendererApi } from '../rendererApi'
+import { progressiveZoomLevel } from '../progressiveZoomVisual'
+import type PostProcessingController from '../mods/extenssr/post_processing_controller'
 const { chatguessrApi } = window
 
 // probably not necessary
@@ -152,8 +170,268 @@ const scoringMode = shallowRef<ScoringMode>('off')
 const guessMarkersLimit = shallowRef<number | null>(null)
 const currentLocation = shallowRef<LatLng | null>(null)
 const gameResultLocations = shallowRef<Location_[] | null>(null)
+const peepholeEnabled = shallowRef(false)
+const peepholeSize = shallowRef<Settings['peepholeSize']>('small')
+const peepholeX = shallowRef(50)
+const peepholeY = shallowRef(50)
+const peepholeVisible = computed(() => peepholeEnabled.value && gameState.value === 'in-round')
+const peepholeRadius = computed(() => ({ tiny: 4, small: 7, medium: 11, large: 16 })[peepholeSize.value])
+const progressiveZoomEnabled = shallowRef(false)
+const progressiveZoomRound = shallowRef<{ startedAt: number; durationMs: number } | null>(null)
+let progressiveZoomFrame: number | null = null
+let progressiveZoomPending = false
+let progressiveZoomListener: { remove: () => void } | null = null
+let progressiveZoomRequest = 0
+let controlledPanorama: typeof MWStreetViewInstance | null = null
+let previousZoomOptions: { zoomControl: boolean; scrollwheel: boolean; disableDoubleClickZoom: boolean } | null = null
+let earlyRevealArmed = false
+let earlyRevealStartedAt: number | null = null
+let earlyRevealNormalZoom = 1
+let earlyRevealFallback: ReturnType<typeof setTimeout> | null = null
+
+function stopProgressiveZoom() {
+  progressiveZoomRequest++
+  if (progressiveZoomFrame !== null) cancelAnimationFrame(progressiveZoomFrame)
+  progressiveZoomFrame = null
+  progressiveZoomPending = false
+  progressiveZoomRound.value = null
+  progressiveZoomListener?.remove()
+  progressiveZoomListener = null
+  if (controlledPanorama && previousZoomOptions) controlledPanorama.setOptions(previousZoomOptions)
+  controlledPanorama = null
+  previousZoomOptions = null
+  earlyRevealArmed = false
+  earlyRevealStartedAt = null
+  if (earlyRevealFallback !== null) clearTimeout(earlyRevealFallback)
+  earlyRevealFallback = null
+}
+
+function beginEarlyReveal(panorama: google.maps.StreetViewPanorama) {
+  if (!earlyRevealArmed || !progressiveZoomEnabled.value) return
+  earlyRevealArmed = false
+  earlyRevealNormalZoom = panorama.getZoom() ?? 1
+  earlyRevealStartedAt = Date.now()
+  const timerSettings = getLocalStorage('cg_timer__settings', { timeLimit: 90 })
+  const durationMs = Math.max(5, Number(timerSettings.timeLimit) || 90) * 1000
+  const tick = () => {
+    if (earlyRevealStartedAt === null || !progressiveZoomEnabled.value) return
+    const currentPanorama = MWStreetViewInstance ?? panorama
+    const elapsedMs = Date.now() - earlyRevealStartedAt
+    const zoom = progressiveZoomLevel(earlyRevealNormalZoom, elapsedMs, durationMs)
+    if (Math.abs(currentPanorama.getZoom() - zoom) > 0.001) currentPanorama.setZoom(zoom)
+    if (elapsedMs < durationMs) progressiveZoomFrame = requestAnimationFrame(tick)
+    else progressiveZoomFrame = null
+  }
+  tick()
+}
+
+function armEarlyReveal() {
+  if (gameState.value === 'in-round' && progressiveZoomRound.value) return
+  stopProgressiveZoom()
+  progressiveZoomEnabled.value = true
+  earlyRevealArmed = true
+  // GeoGuessr can reuse a panorama between rounds without calling setPano.
+  earlyRevealFallback = setTimeout(() => {
+    if (MWStreetViewInstance) beginEarlyReveal(MWStreetViewInstance)
+  }, 2500)
+}
+
+onBeforeUnmount(chatguessrApi.onProgressiveZoomLoading(armEarlyReveal))
+
+function onProgressiveZoomSettingsChange(enabled: boolean) {
+  progressiveZoomEnabled.value = enabled
+  if (!enabled) stopProgressiveZoom()
+  else if (gameState.value === 'in-round' && currentLocation.value) startProgressiveZoom(currentLocation.value)
+}
+
+function startProgressiveZoom(location: Location_ | LatLng | null) {
+  const visualStartedAt = earlyRevealStartedAt
+  const visualNormalZoom = earlyRevealNormalZoom
+  stopProgressiveZoom()
+  if (!progressiveZoomEnabled.value || !location) return
+  const request = progressiveZoomRequest
+  progressiveZoomPending = true
+  const normalZoom = 'zoom' in location && typeof location.zoom === 'number' ? location.zoom : visualNormalZoom
+  const initialZoom = Math.max(4, normalZoom)
+  const roundEventAt = Date.now()
+  const timerSettings = getLocalStorage('cg_timer__settings', { timeLimit: 90 })
+  const timeLimit = Number(timerSettings.timeLimit)
+  const durationMs = Math.max(5, timeLimit || 90) * 1000
+  const localRound = { startedAt: visualStartedAt ?? roundEventAt, durationMs }
+  progressiveZoomRound.value = localRound
+
+  const beginReveal = async (timeLimit: number) => {
+    let round: { startedAt: number; durationMs: number } | null
+    try {
+      round = await chatguessrApi.startProgressiveZoomRound(timeLimit, visualStartedAt ?? undefined)
+    } catch (error) {
+      console.error('Could not start progressive zoom', error)
+      return
+    } finally {
+      if (request === progressiveZoomRequest) progressiveZoomPending = false
+    }
+    if (!round || request !== progressiveZoomRequest || !progressiveZoomEnabled.value || gameState.value !== 'in-round') return
+    progressiveZoomRound.value = round
+  }
+
+  const animateReveal = () => {
+    let attachedPanorama: typeof MWStreetViewInstance | null = null
+    let expectedZoom = initialZoom
+    const updateZoom = () => {
+      if (gameState.value !== 'in-round' || !progressiveZoomEnabled.value) {
+        stopProgressiveZoom()
+        return
+      }
+      const panorama = MWStreetViewInstance
+      if (!panorama) {
+        progressiveZoomFrame = requestAnimationFrame(updateZoom)
+        return
+      }
+      if (panorama !== attachedPanorama) {
+        progressiveZoomListener?.remove()
+        if (controlledPanorama && previousZoomOptions) controlledPanorama.setOptions(previousZoomOptions)
+        previousZoomOptions = {
+          zoomControl: panorama.get('zoomControl'),
+          scrollwheel: panorama.get('scrollwheel'),
+          disableDoubleClickZoom: panorama.get('disableDoubleClickZoom')
+        }
+        controlledPanorama = panorama
+        panorama.setOptions({ zoomControl: false, scrollwheel: false, disableDoubleClickZoom: true })
+        attachedPanorama = panorama
+      }
+      const round = progressiveZoomRound.value ?? localRound
+      const elapsedMs = Date.now() - round.startedAt
+      const progress = Math.max(0, Math.min(1, elapsedMs / round.durationMs))
+      expectedZoom = progressiveZoomLevel(normalZoom, elapsedMs, round.durationMs)
+      const zoom = panorama.getZoom()
+      if (typeof zoom !== 'number' || Math.abs(zoom - expectedZoom) > 0.001) panorama.setZoom(expectedZoom)
+      if (progress === 1) {
+        progressiveZoomFrame = null
+        progressiveZoomListener = panorama.addListener('zoom_changed', () => {
+          if (Math.abs(panorama.getZoom() - normalZoom) > 0.02) panorama.setZoom(normalZoom)
+        })
+      } else {
+        progressiveZoomFrame = requestAnimationFrame(updateZoom)
+      }
+    }
+    updateZoom()
+  }
+  // The visual reveal starts without waiting for panorama status or scoring IPC.
+  animateReveal()
+  void beginReveal(timeLimit)
+}
+
+function onPeepholeSettingsChange(enabled: boolean, size: Settings['peepholeSize']) {
+  if (enabled && (!peepholeEnabled.value || size !== peepholeSize.value)) centerPeephole()
+  peepholeEnabled.value = enabled
+  peepholeSize.value = size
+}
+
+function centerPeephole() {
+  peepholeX.value = 50
+  peepholeY.value = 50
+}
+
+onMounted(async () => {
+  const settings = await chatguessrApi.getSettings()
+  onPeepholeSettingsChange(settings.peepholeModeEnabled, settings.peepholeSize)
+  onProgressiveZoomSettingsChange(settings.progressiveZoomModeEnabled)
+  if (settings.progressiveZoomModeEnabled && window.location.pathname.includes('/game/') && gameState.value !== 'in-round') armEarlyReveal()
+})
+watch(gameState, (state) => {
+  if (state !== 'in-round') stopProgressiveZoom()
+})
+onBeforeUnmount(stopProgressiveZoom)
 
 var MWStreetViewInstance
+installStreetViewCapture()
+
+function installStreetViewCapture() {
+  let observer: MutationObserver | null = null
+  let poll: ReturnType<typeof setInterval> | null = null
+  const watchedScripts = new WeakSet<HTMLScriptElement>()
+  const watchedPanoramas = new WeakSet<google.maps.StreetViewPanorama>()
+  const ignoredPanoramas = new WeakSet<google.maps.StreetViewPanorama>()
+  const rememberPanorama = (panorama: google.maps.StreetViewPanorama) => {
+    if (ignoredPanoramas.has(panorama)) return
+    MWStreetViewInstance = panorama
+    if (!watchedPanoramas.has(panorama)) {
+      watchedPanoramas.add(panorama)
+      panorama.addListener('pano_changed', () => beginEarlyReveal(panorama))
+      panorama.addListener('status_changed', () => {
+        if (panorama.getStatus() === google.maps.StreetViewStatus.OK) beginEarlyReveal(panorama)
+      })
+    }
+    beginEarlyReveal(panorama)
+  }
+
+  const install = () => {
+    if (typeof google === 'undefined' || !google.maps?.StreetViewPanorama) return false
+    const Original = google.maps.StreetViewPanorama as typeof google.maps.StreetViewPanorama & { __cgCaptured?: boolean }
+    if (Original.__cgCaptured) return true
+
+    const setPano = Original.prototype.setPano
+    Original.prototype.setPano = function (pano: string) {
+      const result = setPano.call(this, pano)
+      rememberPanorama(this)
+      return result
+    }
+    const setPosition = Original.prototype.setPosition
+    Original.prototype.setPosition = function (position: google.maps.LatLng | google.maps.LatLngLiteral | null) {
+      const result = setPosition.call(this, position)
+      rememberPanorama(this)
+      return result
+    }
+    const setZoom = Original.prototype.setZoom
+    Original.prototype.setZoom = function (zoom: number) {
+      const result = setZoom.call(this, zoom)
+      rememberPanorama(this)
+      return result
+    }
+    class CapturedStreetViewPanorama extends Original {
+      constructor(...args: ConstructorParameters<typeof google.maps.StreetViewPanorama>) {
+        super(...args)
+        if (args[0] instanceof HTMLElement && args[0].closest('#debugElement')) {
+          ignoredPanoramas.add(this)
+          return
+        }
+        rememberPanorama(this)
+      }
+    }
+    ;(CapturedStreetViewPanorama as typeof Original).__cgCaptured = true
+    google.maps.StreetViewPanorama = CapturedStreetViewPanorama
+    observer?.disconnect()
+    if (poll !== null) clearInterval(poll)
+    return true
+  }
+
+  if (install()) return
+
+  const watchScript = (script: HTMLScriptElement) => {
+    if (watchedScripts.has(script) || !script.src.startsWith('https://maps.googleapis.com/')) return
+    watchedScripts.add(script)
+    const oldOnload = script.onload
+    script.onload = function (event) {
+      install()
+      return oldOnload?.call(this, event)
+    }
+    script.addEventListener('load', install)
+  }
+  document.querySelectorAll('script[src^="https://maps.googleapis.com/"]').forEach((script) => watchScript(script as HTMLScriptElement))
+  observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node instanceof HTMLScriptElement) watchScript(node)
+      }
+    }
+  })
+  observer.observe(document.documentElement, { childList: true, subtree: true })
+  poll = setInterval(install, 50)
+  onBeforeUnmount(() => {
+    observer?.disconnect()
+    if (poll !== null) clearInterval(poll)
+  })
+}
 let spinInterval: NodeJS.Timeout | null = null
 
 // Make sure game mode is not set to 'challenge'
@@ -270,10 +548,13 @@ onBeforeUnmount(
     modeHelp.value = _modeHelp
     scoringMode.value = _scoringMode ?? 'off'
     gameState.value = 'in-round'
+    centerPeephole()
+    window.ppController?.reshuffleTileReveal()
     
 
 
     currentLocation.value = location
+    startProgressiveZoom(location)
     if (satelliteMode.value.enabled) {
       rendererApi.showSatelliteMap(location)
     } else {
@@ -297,6 +578,8 @@ onBeforeUnmount(
 onBeforeUnmount(
   chatguessrApi.onRoundStarted(async(_modeHelp, _scoringMode) => {
     gameState.value = 'in-round'
+    centerPeephole()
+    window.ppController?.reshuffleTileReveal()
     modeHelp.value = _modeHelp
     scoringMode.value = _scoringMode ?? 'off'
     }
@@ -339,9 +622,13 @@ async function rotationFunction(){
 }
 
 onBeforeUnmount(
-  chatguessrApi.onStartRound(async() => {
+  chatguessrApi.onStartRound(async(_isMultiGuess, location) => {
         // console.log all settings
     gameState.value = 'in-round'
+    currentLocation.value = location
+    startProgressiveZoom(location)
+    centerPeephole()
+    window.ppController?.reshuffleTileReveal()
     rendererApi.clearMarkers()
     scoreboard.value!.onStartRound()
     try{
@@ -360,6 +647,7 @@ onBeforeUnmount(
     if (gameState.value !== 'round-results') gameState.value = 'in-round'
     //console.log(settings, "settings")
     currentLocation.value = location
+    if (gameState.value === 'in-round' && !progressiveZoomPending && progressiveZoomFrame === null && !progressiveZoomListener) startProgressiveZoom(location)
     if (satelliteMode.value.enabled) {
       rendererApi.showSatelliteMap(location)
     }
@@ -369,6 +657,7 @@ onBeforeUnmount(
 declare global {
   interface Window {
     initialize: () => void;
+    ppController?: PostProcessingController | null
   }
 }
 onBeforeUnmount(
@@ -510,6 +799,7 @@ onBeforeUnmount(
 )
 onBeforeUnmount(
   chatguessrApi.onZoomIn((value) => {
+    if (progressiveZoomEnabled.value && gameState.value === 'in-round') return
     let zoom = MWStreetViewInstance.getZoom()
     let newZoom = zoom + value
     MWStreetViewInstance.setZoom(newZoom)
@@ -517,9 +807,41 @@ onBeforeUnmount(
 )
 onBeforeUnmount(
   chatguessrApi.onZoomOut((value) => {
+    if (progressiveZoomEnabled.value && gameState.value === 'in-round') return
     let zoom = MWStreetViewInstance.getZoom()
     let newZoom = zoom - value
     MWStreetViewInstance.setZoom(newZoom)
+  })
+)
+onBeforeUnmount(
+  chatguessrApi.onResetView((location, canMove, canRotate, canZoom) => {
+    if (gameState.value !== 'in-round' || !MWStreetViewInstance) return
+
+    if (canMove) {
+      if (location.panoId) MWStreetViewInstance.setPano(location.panoId)
+      else MWStreetViewInstance.setPosition({ lat: location.lat, lng: location.lng })
+    }
+    if (canRotate) MWStreetViewInstance.setPov({ heading: location.heading, pitch: location.pitch })
+    if (canZoom && !progressiveZoomEnabled.value) MWStreetViewInstance.setZoom(location.zoom)
+  })
+)
+onBeforeUnmount(
+  chatguessrApi.onMovePeephole((direction) => {
+    if (!peepholeVisible.value) return
+    if (direction === 'center') {
+      centerPeephole()
+      return
+    }
+
+    const radiusPx = (peepholeRadius.value / 100) * Math.min(window.innerWidth, window.innerHeight)
+    const minX = (radiusPx / window.innerWidth) * 100
+    const minY = (radiusPx / window.innerHeight) * 100
+    const clamp = (value: number, minimum: number) => Math.max(minimum, Math.min(100 - minimum, value))
+
+    if (direction === 'left') peepholeX.value = clamp(peepholeX.value - 10, minX)
+    if (direction === 'right') peepholeX.value = clamp(peepholeX.value + 10, minX)
+    if (direction === 'up') peepholeY.value = clamp(peepholeY.value - 10, minY)
+    if (direction === 'down') peepholeY.value = clamp(peepholeY.value + 10, minY)
   })
 )
 
@@ -779,66 +1101,6 @@ function useTwitchConnectionState() {
   onMounted(async () => {
     const state = await chatguessrApi.getTwitchConnectionState()
     conn.value = state
-
-
-    function overrideOnLoad(googleScript, observer, overrider) {
-  const oldOnload = googleScript.onload
-  googleScript.onload = (event) => {
-      const google = window.google
-      if (google) {
-          observer.disconnect()
-          overrider(google)
-      }
-      if (oldOnload) {
-          oldOnload.call(googleScript, event)
-      }
-  }
-}
- 
-function grabGoogleScript(mutations) {
-  for (const mutation of mutations) {
-      for (const newNode of mutation.addedNodes) {
-          const asScript = newNode
-          if (asScript && asScript.src && asScript.src.startsWith('https://maps.googleapis.com/')) {
-              return asScript
-          }
-      }
-  }
-  return null
-}
- 
-function injecter(overrider) {
-  if (document.documentElement)
-  {
-      injecterCallback(overrider);
-  }
-}
- 
-function injecterCallback(overrider)
-{
-  new MutationObserver((mutations, observer) => {
-      const googleScript = grabGoogleScript(mutations)
-      if (googleScript) {
-          overrideOnLoad(googleScript, observer, overrider)
-      }
-  }).observe(document.documentElement, { childList: true, subtree: true })
-}
- 
-
-  injecter(() => {
-    google.maps.StreetViewPanorama = class extends google.maps.StreetViewPanorama {
-      constructor(...args: any[]) {
-          super(...args as [any, ...any[]]);
-          MWStreetViewInstance = this;
-      }
-    }
-  });
-
-console.log(MWStreetViewInstance, "MWStreetViewInstance")
-
-
-
-
   })
 
   onBeforeUnmount(
@@ -896,6 +1158,22 @@ function useSocketConnectionState() {
   pointer-events: none;
 }
 
+.cg-frame-container.peephole-active {
+  z-index: 20;
+}
+
+.cg-peephole-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background: radial-gradient(
+    circle var(--peephole-radius) at var(--peephole-x) var(--peephole-y),
+    transparent calc(var(--peephole-radius) - 1px),
+    #000 var(--peephole-radius)
+  );
+}
+
 .cg-menu {
   position: fixed;
   display: flex;
@@ -904,6 +1182,10 @@ function useSocketConnectionState() {
   top: 120px;
   right: 7px;
   z-index: 1;
+}
+
+.cg-menu.peephole-active {
+  z-index: 21;
 }
 
 .cg-button {

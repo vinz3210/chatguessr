@@ -26,6 +26,28 @@ function createGame() {
   return token
 }
 
+it('stores the elapsed progressive zoom time for a guess and its replacement', () => {
+  const user = db.getOrCreateUser('zoom-player', 'zoom-player', undefined, undefined)!
+  const roundId = db.createRound(createGame(), {
+    lat: 0, lng: 0, panoId: null, heading: 0, pitch: 0, zoom: 0
+  })
+  const guess = {
+    location: { lat: 0, lng: 0 },
+    streakCode: null,
+    streak: 0,
+    lastStreak: null,
+    distance: 0,
+    score: 2500,
+    isRandomPlonk: 0,
+    progressiveZoomTimeMs: 45000
+  }
+  const guessId = db.createGuess(roundId, user.id, guess)
+  expect(db.getRoundResults(roundId)[0].progressiveZoomTimeMs).toBe(45000)
+
+  db.updateGuess(guessId, { ...guess, progressiveZoomTimeMs: 60000 })
+  expect(db.getRoundResults(roundId)[0].progressiveZoomTimeMs).toBe(60000)
+})
+
 describe('userGuessedOnOngoingRound', () => {
   it('returnsTrueWhenUserHasGuessed', () => {
     const broadcaster = db.getOrCreateUser('BROADCASTER', 'BROADCASTER', undefined, undefined)

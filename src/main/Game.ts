@@ -1,4 +1,5 @@
 import pMap from 'p-map'
+import { progressiveZoomScore } from './utils/progressiveZoom'
 
 import {
   compareLatLng,
@@ -26,6 +27,8 @@ export default class Game {
    * The database UUID of the current round.
    */
   #roundId: string | undefined
+  #progressiveZoomRound: { roundId: string; startedAt: number; durationMs: number; affectedPoints: number } | undefined
+  #streamerGuessReceivedAt = 0
 
   /**
    * Streak code for the current round's location.
@@ -119,7 +122,7 @@ export default class Game {
     return this.randomRoundMultiplier
   }
 
-  async start(url: string, isMultiGuess: boolean, brCounter: { [key: string]: number }) {
+  async start(url: string, isMultiGuess: boolean, brCounter: { [key: string]: number }, onRoundReady?: () => void) {
 
     this.isGiftingPointsGame = this.#settings.isGiftingPointsGame
     this.gamePointGift = this.#settings.gamePointGift
@@ -164,6 +167,8 @@ export default class Game {
           throw err
         }
       }
+      this.location = this.getLocation()
+      onRoundReady?.()
       const fetchedMap = await fetchMap(this.seed.map)
       if (fetchedMap) {
         this.maxErrorDistance = fetchedMap.maxErrorDistance
@@ -180,6 +185,37 @@ export default class Game {
 
   getRoundId() {
     return this.#roundId
+  }
+
+  startProgressiveZoomRound(timeLimit: number, panoramaReadyAt?: number) {
+    if (!this.#settings.progressiveZoomModeEnabled || !this.isInGame || !this.#roundId) return null
+    if (this.#progressiveZoomRound?.roundId !== this.#roundId) {
+      const seconds = Number.isFinite(timeLimit) ? Math.max(5, timeLimit) : 90
+      const now = Date.now()
+      this.#progressiveZoomRound = {
+        roundId: this.#roundId,
+        startedAt: Number.isFinite(panoramaReadyAt) && panoramaReadyAt! <= now
+          ? Math.max(now - seconds * 1000, panoramaReadyAt!)
+          : now,
+        durationMs: seconds * 1000,
+        affectedPoints: Number.isFinite(this.#settings.progressiveZoomAffectedPoints)
+          ? Math.max(0, Math.min(5000, this.#settings.progressiveZoomAffectedPoints))
+          : 5000
+      }
+    }
+    return this.#progressiveZoomRound
+  }
+
+  #applyProgressiveZoomScore(score: number, guessedAt: number) {
+    const round = this.#progressiveZoomRound
+    if (!this.#settings.progressiveZoomModeEnabled || !round || round.roundId !== this.#roundId || score <= 0) return score
+    return progressiveZoomScore(score, guessedAt, round.startedAt, round.durationMs, round.affectedPoints)
+  }
+
+  #progressiveZoomGuessTimeMs(guessedAt: number): number | null {
+    const round = this.#progressiveZoomRound
+    if (!this.#settings.progressiveZoomModeEnabled || !round || round.roundId !== this.#roundId) return null
+    return Math.max(0, Math.min(guessedAt - round.startedAt, round.durationMs))
   }
 
   #streamerHasGuessed(seed: Seed) {
@@ -200,6 +236,7 @@ export default class Game {
 
     // If a guess has been committed, process streamer guess then return scores
     if (newSeed && this.#streamerHasGuessed(newSeed)) {
+      this.#streamerGuessReceivedAt = Date.now()
       this.closeGuesses()
       if (Object.keys(callbackFunctions).indexOf("disappointed") !== -1) {
         Object.keys(callbackFunctions.disappointed.callbacks).forEach((key) => {
@@ -328,6 +365,7 @@ export default class Game {
     let numberofGamesInRoundFromRoundId = this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!)
     console.log("numberofGamesInRoundFromRoundId", numberofGamesInRoundFromRoundId)
     var score = streamerGuess.timedOut ? 0 : calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier, this.#settings.scoringMode, axisDistances)
+    score = this.#applyProgressiveZoomScore(score, this.#streamerGuessReceivedAt || Date.now())
     if (numberofGamesInRoundFromRoundId !== 1 && this.isGameOfChickenModeActivated) {
       const didUserWinLastRound = this.#db.didUserWinLastRound('BROADCASTER', this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)
       if (didUserWinLastRound) {
@@ -344,7 +382,8 @@ export default class Game {
       lastStreak: lastStreak?.count && !correct ? lastStreak.count : null,
       distance,
       score,
-      isRandomPlonk: this.streamerDidRandomPlonk ? 1 : 0
+      isRandomPlonk: this.streamerDidRandomPlonk ? 1 : 0,
+      progressiveZoomTimeMs: this.#progressiveZoomGuessTimeMs(this.#streamerGuessReceivedAt || Date.now())
     })
     this.streamerDidRandomPlonk = false
     setTimeout(() => {
@@ -354,6 +393,7 @@ export default class Game {
 
 
   async handleUserGuess(userstate: UserData, location: LatLng, isRandomPlonk: boolean = false, brIsAllowedToReguess = false, brCounter: number = 1, forceGuess = false): Promise<Guess> {
+    const guessedAt = Date.now()
     var dbUser = this.#db.getUser(userstate['user-id'])
     if (!dbUser || !isRandomPlonk) {
       dbUser = this.#db.getOrCreateUser(
@@ -398,6 +438,7 @@ export default class Game {
     let numberofGamesInRoundFromRoundId = this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!)
     console.log("numberofGamesInRoundFromRoundId", numberofGamesInRoundFromRoundId)
     var score = calculateScore(distance, this.mapScale!, await getStreakCode(location) === this.#streakCode, this.isClosestInWrongCountryModeActivated, this.waterPlonkMode, await isCoordsInLand(location), this.invertScoring, modifierMinusPointsIfWrongCountry, this.#settings.isBRMode, subtractedBRPoints, this.#settings.allowMinus, this.maxErrorDistance, numberofGamesInRoundFromRoundId, this.#settings.roundMultis, this.randomRoundMultiplier, this.#settings.scoringMode, axisDistances) // player guess
+    score = this.#applyProgressiveZoomScore(score, guessedAt)
     if (this.#db.getNumberOfGamesInRoundFromRoundId(this.#roundId!) !== 1 && this.isGameOfChickenModeActivated) {
 
       const didUserWinLastRound = this.#db.didUserWinLastRound(dbUser.id, this.#roundId!, this.invertScoring, this.chickenModeSurvivesWith5k)
@@ -450,6 +491,7 @@ export default class Game {
       distance,
       score,
       isRandomPlonk: isRandomPlonk ? 1 : 0,
+      progressiveZoomTimeMs: this.#progressiveZoomGuessTimeMs(guessedAt)
 
     }
 
@@ -482,6 +524,7 @@ export default class Game {
       latDegrees: axisDistances.latDeg,
       lngDegrees: axisDistances.lngDeg,
       score,
+      progressiveZoomTimeMs: guess.progressiveZoomTimeMs,
       modified,
       isRandomPlonk,
       brCounter
@@ -531,6 +574,9 @@ export default class Game {
     if (this.#settings.exclusiveMode) {
       parts.push("Exclusive mode")
     }
+    if (this.#settings.progressiveZoomModeEnabled) {
+      parts.push(`Progressive zoom (${this.#settings.progressiveZoomAffectedPoints}/5000 points affected by time)`)
+    }
 
     if (this.#settings.isClosestInWrongCountryModeActivated) {
       parts.push("Wrong country only")
@@ -578,6 +624,9 @@ export default class Game {
     }
     if (this.#settings.aiDescriptionMode) {
       parts.push('AI description 🤖')
+    }
+    if (this.#settings.peepholeModeEnabled) {
+      parts.push(`Peephole (${this.#settings.peepholeSize}) — !peephole`)
     }
     if (this.#settings.waterPlonkMode !== "normal") {
       if (this.#settings.waterPlonkMode === "illegal") {

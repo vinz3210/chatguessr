@@ -10,6 +10,9 @@ interface Window {
   toggleScrambleMode: (el: HTMLInputElement) => void
   toggleRescrambleMode: (el: HTMLInputElement) => void
   setRescrambleTime: (value: number) => void
+  setScrambleGridSize: (value: number) => void
+  toggleTileRevealMode: (el: HTMLInputElement) => void
+  setVisibleTileCount: (value: number) => void
   togglePixelateMode: (el: HTMLInputElement) => void
   toggleBlinkMode: (el: HTMLInputElement) => void
   changeBlinkTime: (el: HTMLInputElement) => void

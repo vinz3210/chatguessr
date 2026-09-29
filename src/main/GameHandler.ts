@@ -58,8 +58,6 @@ export default class GameHandler {
 
   #nextRoundInFlight = false
 
-  TMPZ: boolean
-
   constructor(
     db: Database,
     win: Electron.BrowserWindow,
@@ -76,7 +74,6 @@ export default class GameHandler {
     this.#disappointedUsers = []
     this.#pay2WinUsers = []
     this.#russianHitmans = []
-    this.TMPZ = false
     this.init()
   }
 
@@ -492,25 +489,35 @@ export default class GameHandler {
     // Browser Listening
     this.#win.webContents.on('did-navigate-in-page', (_event, url) => {
       if (isGameURL(url)) {
+        if (settings.progressiveZoomModeEnabled) this.#win.webContents.send('progressive-zoom-loading')
         // TODO(reanna) warn about the thing not being connected
         if (!this.#backend) return
 
+        let roundAnnounced = false
+        const announceRound = () => {
+          roundAnnounced = true
+          const restoredGuesses = this.#game.isMultiGuess
+            ? this.#game.getRoundParticipants()
+            : this.#game.getRoundResults()
+
+          this.#win.webContents.send(
+            'game-started',
+            this.#game.isMultiGuess,
+            settings.isBRMode,
+            this.#game.getModeHelpStartOfRound(),
+            restoredGuesses,
+            this.#game.getLocation(),
+            settings.scoringMode
+          )
+        }
+
         this.#game
-          .start(url, settings.isMultiGuess, this.#battleRoyaleCounter)
+          .start(url, settings.isMultiGuess, this.#battleRoyaleCounter, announceRound)
           .then(() => {
+            if (!roundAnnounced) announceRound()
             const restoredGuesses = this.#game.isMultiGuess
               ? this.#game.getRoundParticipants()
               : this.#game.getRoundResults()
-
-            this.#win.webContents.send(
-              'game-started',
-              this.#game.isMultiGuess,
-              settings.isBRMode,
-              this.#game.getModeHelpStartOfRound(),
-              restoredGuesses,
-              this.#game.getLocation(),
-              settings.scoringMode
-            )
 
             if (restoredGuesses.length > 0) {
               this.#backend?.sendMessage(`🌎 Round ${this.#game.round} has resumed`, {
@@ -668,6 +675,9 @@ export default class GameHandler {
 
     ipcMain.handle('get-settings', () => {
       return settings
+    })
+    ipcMain.handle('start-progressive-zoom-round', (_event, timeLimit: number, panoramaReadyAt?: number) => {
+      return this.#game.startProgressiveZoomRound(timeLimit, panoramaReadyAt)
     })
 
     useAiDescription(() =>
@@ -980,6 +990,8 @@ export default class GameHandler {
       returnString += `wrongCountryOnly: on | `
     if (settings.exclusiveMode)
       returnString += `Exclusive Mode: on | `
+    if (settings.progressiveZoomModeEnabled)
+      returnString += `Progressive zoom: on (${settings.progressiveZoomAffectedPoints}/5000 points affected by time) | `
     if (settings.isBRMode)
       returnString += `Allowed Guesses in total: ${settings.battleRoyaleReguessLimit}${(settings.battleRoyaleSubtractedPoints!=0)?", "+(settings.battleRoyaleSubtractedPoints*-1)+" per Plonk":"" } | `
     if (settings.waterPlonkMode === "mandatory")
@@ -1479,30 +1491,87 @@ export default class GameHandler {
       return
     }
     
+    if (message === '!peephole' || message === '!ph') {
+      const status = settings.peepholeModeEnabled ? 'on' : 'off (enable in Mode Settings)'
+      await this.#backend?.sendMessage(
+        `Peephole ${status}: !ph up/down/left/right moves the circle 10% of the screen; !ph u/d/l/r are shortcuts; !ph center (or !ph c) recenters it. Size: Tiny, Small, Medium, or Large in Mode Settings.`
+      )
+      return
+    }
+
+    if (settings.peepholeModeEnabled && this.#game.isInGame && message.startsWith('!ph ')) {
+      const direction = message.split(/\s+/)[1]
+      const aliases: Record<string, string> = {
+        u: 'up',
+        d: 'down',
+        l: 'left',
+        r: 'right',
+        c: 'center'
+      }
+      const move = aliases[direction] ?? direction
+      if (['up', 'down', 'left', 'right', 'center'].includes(move)) {
+        this.#win.webContents.send('move-peephole', move)
+      }
+      return
+    }
+
+    if (message === '!tmpz') {
+      const status = settings.isTMPZModeEnabled ? 'on' : 'off (enable in Mode Settings)'
+      await this.#backend?.sendMessage(
+        `TMPZ ${status}: !mf forward, !mb back; !pl/!pr left/right, !pu/!pd up/down (45° default; e.g. !pu 20); !zi/!zo zoom in/out (1 default; disabled during progressive zoom); !rs reset to round start. Full commands also work. 5s cooldown per user; round rules apply.`
+      )
+      return
+    }
+
     // move commands
-    if(this.#game && this.#game.seed && this.TMPZ){
+    if(this.#game && this.#game.seed && settings.isTMPZModeEnabled){
+      const command = message.split(' ')[0]
+      const aliases: Record<string, string> = {
+        '!mf': '!moveforward',
+        '!mb': '!movebackward',
+        '!pl': '!panleft',
+        '!pr': '!panright',
+        '!pu': '!panup',
+        '!pd': '!pandown',
+        '!zi': '!zoomin',
+        '!zo': '!zoomout',
+        '!rs': '!reset'
+      }
+      const tmpzCommand = aliases[command] ?? command
+      const isAllowedTMPZCommand =
+        (!this.#game.seed.forbidMoving && /^!move(?:forward|backwards?)$/.test(tmpzCommand)) ||
+        (!this.#game.seed.forbidRotating && /^!pan(?:left|right|up|down)$/.test(tmpzCommand)) ||
+        (!this.#game.seed.forbidZooming && !settings.progressiveZoomModeEnabled && /^!zoom(?:in|out)$/.test(tmpzCommand)) ||
+        tmpzCommand === '!reset'
+
+      if(isAllowedTMPZCommand && userstate?.username){
+        const now = Date.now()
+        const lastCommand = this.#moveCommandTimeKeeper[userstate.username]
+        if(lastCommand && now - lastCommand < 5000) return
+        this.#moveCommandTimeKeeper[userstate.username] = now
+      }
+
+      if(tmpzCommand === '!reset'){
+        this.#win.webContents.send(
+          'reset-view',
+          this.#game.getLocation(),
+          !this.#game.seed.forbidMoving,
+          !this.#game.seed.forbidRotating,
+          !this.#game.seed.forbidZooming && !settings.progressiveZoomModeEnabled
+        )
+      }
+
       if(!this.#game.seed.forbidMoving){
-        if(userstate && userstate.username){
-          if(!this.#moveCommandTimeKeeper[userstate.username]){
-            this.#moveCommandTimeKeeper[userstate.username] = Date.now()
-          }
-          else{
-            if(Date.now() - this.#moveCommandTimeKeeper[userstate.username] < 5000){
-              this.#moveCommandTimeKeeper[userstate.username] = Date.now()
-              return
-            }
-          }
-        }
-        if(message.startsWith("!moveforward")){
+        if(tmpzCommand === '!moveforward'){
           console.log("moveForward command")
           this.#win.webContents.send('move-forward', true)
         }
-        if(message.startsWith("!movebackwards")|| message.startsWith("!movebackward")){
+        if(tmpzCommand === '!movebackwards' || tmpzCommand === '!movebackward'){
           this.#win.webContents.send('move-backward', true)
         }
       }
       if(!this.#game.seed.forbidRotating){
-        if(message.startsWith("!panleft")){
+        if(tmpzCommand === '!panleft'){
           let degrees = 45
           if(message.indexOf(" ") > 0){
             let value = message.split(" ")[1]
@@ -1512,7 +1581,7 @@ export default class GameHandler {
           }
           this.#win.webContents.send('pan-left', degrees)
         }
-        if(message.startsWith("!panright")){
+        if(tmpzCommand === '!panright'){
           let degrees = 45
           if(message.indexOf(" ") > 0){
             let value = message.split(" ")[1]
@@ -1523,7 +1592,7 @@ export default class GameHandler {
           this.#win.webContents.send('pan-right', degrees)
           
         }
-        if(message.startsWith("!panup")){
+        if(tmpzCommand === '!panup'){
           let degrees = 45
           if(message.indexOf(" ") > 0){
             let value = message.split(" ")[1]
@@ -1534,7 +1603,7 @@ export default class GameHandler {
           this.#win.webContents.send('pan-up', degrees)
           
         }
-        if(message.startsWith("!pandown")){
+        if(tmpzCommand === '!pandown'){
           let degrees = 45
           if(message.indexOf(" ") > 0){
             let value = message.split(" ")[1]
@@ -1546,9 +1615,9 @@ export default class GameHandler {
           
         }
       }
-      if(!this.#game.seed.forbidZooming){
+      if(!this.#game.seed.forbidZooming && !settings.progressiveZoomModeEnabled){
 
-        if(message.startsWith("!zoomin")){
+        if(tmpzCommand === '!zoomin'){
           let zoomValue = 1
           if(message.indexOf(" ") > 0){
             let value = message.split(" ")[1]
@@ -1558,7 +1627,7 @@ export default class GameHandler {
           }
           this.#win.webContents.send('zoom-in', zoomValue)
         }
-        if(message.startsWith("!zoomout")){
+        if(tmpzCommand === '!zoomout'){
           let zoomValue = 1
           if(message.indexOf(" ") > 0){
             let value = message.split(" ")[1]

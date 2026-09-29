@@ -205,6 +205,37 @@
   <div class="ml-05">
     <label
       class="form__group"
+      data-tip="Let Twitch chat move, pan, zoom, and reset the view. Type !tmpz in chat for commands and short aliases. Round rules still apply."
+    >
+      Twitch moves, pans &amp; zooms (TMPZ)
+      <input v-model="settings.isTMPZModeEnabled" type="checkbox" />
+    </label>
+    <label class="form__group" data-tip="Start each location fully zoomed in and reveal it over the CG timer duration. Guessing earlier preserves more of the time-sensitive points.">
+      Progressive zoom mode
+      <input v-model="settings.progressiveZoomModeEnabled" type="checkbox" />
+    </label>
+    <label class="form__group" data-tip="How much of a 5,000-point accuracy score is affected by time. At 2,500, half stays fixed and half falls to zero over the CG timer duration.">
+      Points affected by time
+      <input v-model.number="settings.progressiveZoomAffectedPoints" type="number" min="0" max="5000" step="100" :disabled="!settings.progressiveZoomModeEnabled" @change="normalizeProgressiveZoomAffectedPoints" />
+    </label>
+    <label
+      class="form__group"
+      data-tip="Cover the game view with a black mask and let chat move the circular opening. Type !peephole in chat for commands."
+    >
+      Peephole mode
+      <input v-model="settings.peepholeModeEnabled" type="checkbox" />
+    </label>
+    <label class="form__group" data-tip="Size of the visible circle">
+      Peephole size
+      <select v-model="settings.peepholeSize" :disabled="!settings.peepholeModeEnabled">
+        <option value="tiny">Tiny</option>
+        <option value="small">Small</option>
+        <option value="medium">Medium</option>
+        <option value="large">Large</option>
+      </select>
+    </label>
+    <label
+      class="form__group"
       data-tip="Wrong country mode"
     >
       Wrong country mode
@@ -786,9 +817,18 @@ const tabs = shallowRef([
 ])
 
 const settings = reactive<Settings>(await chatguessrApi.getSettings())
+const emit = defineEmits<{
+  (event: 'peephole-settings-change', enabled: boolean, size: Settings['peepholeSize']): void
+  (event: 'progressive-zoom-settings-change', enabled: boolean): void
+}>()
 watch(settings, () => {
   chatguessrApi.saveSettings(JSON.parse(JSON.stringify(settings)))
 })
+watch(() => settings.progressiveZoomModeEnabled, (enabled) => emit('progressive-zoom-settings-change', enabled))
+watch(
+  () => [settings.peepholeModeEnabled, settings.peepholeSize] as const,
+  ([enabled, size]) => emit('peephole-settings-change', enabled, size)
+)
 
 const newChannelName = shallowRef(settings.channelName)
 const onChannelNameUpdate = () => {
@@ -851,6 +891,11 @@ function modifyIsMultiGusssOnBRMode(event) {
 
 const resetModeSettings = () => {
   // Reset all mode settings to their default values
+  settings.isTMPZModeEnabled = false
+  settings.progressiveZoomModeEnabled = false
+  settings.progressiveZoomAffectedPoints = 5000
+  settings.peepholeModeEnabled = false
+  settings.peepholeSize = 'small'
   settings.isClosestInWrongCountryModeActivated = false
   settings.invertScoring = false
   settings.exclusiveMode = false
@@ -872,6 +917,13 @@ const resetModeSettings = () => {
   settings.waterPlonkMode = "normal"
   settings.modifierMinusPointsIfWrongCountry = 0
   settings.aiDescriptionMode = false
+}
+
+function normalizeProgressiveZoomAffectedPoints() {
+  const points = Number(settings.progressiveZoomAffectedPoints)
+  settings.progressiveZoomAffectedPoints = Number.isFinite(points)
+    ? Math.max(0, Math.min(5000, Math.round(points)))
+    : 5000
 }
 
 </script>
