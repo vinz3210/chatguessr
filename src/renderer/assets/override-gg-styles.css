@@ -200,3 +200,19 @@
 [class^="result-layout_"] > [class^="result-overlay-"] {
   display: none !important;
 }
+
+/* NMNZ movement tab (src/renderer/mods/nmnzTab.ts). The slider position is
+   measured by the mod, since GeoGuessr's own measurement doesn't know about it. */
+[role='tablist'][data-cg-nmnz-tabs] {
+  --tab-active-x: var(--cg-tab-active-x) !important;
+  --tab-active-w: var(--cg-tab-active-w) !important;
+}
+
+/* NMNZ is "No move" underneath, so GeoGuessr still marks that tab active. */
+[role='tablist'][data-cg-nmnz-active] > [role='tab'][data-state='active']:not([data-cg-nmnz]) {
+  color: var(--ds-color-white-60);
+}
+
+[role='tablist'][data-cg-nmnz-active] > [role='tab'][data-state='active']:not([data-cg-nmnz]):hover {
+  color: var(--ds-color-white-100);
+}

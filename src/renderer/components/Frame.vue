@@ -150,6 +150,7 @@ import IconStartFlag from '@/assets/icons/start_flag.svg'
 import IconEyeShut from '@/assets/icons/eye_shut.svg'
 import { rendererApi } from '../rendererApi'
 import { progressiveZoomLevel } from '../progressiveZoomVisual'
+import { installFaceNorthShortcut } from '../faceNorthShortcut'
 import type PostProcessingController from '../mods/extenssr/post_processing_controller'
 const { chatguessrApi } = window
 
@@ -345,6 +346,7 @@ onBeforeUnmount(stopProgressiveZoom)
 
 var MWStreetViewInstance
 installStreetViewCapture()
+onBeforeUnmount(installFaceNorthShortcut(() => MWStreetViewInstance))
 
 function installStreetViewCapture() {
   let observer: MutationObserver | null = null

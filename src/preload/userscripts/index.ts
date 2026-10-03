@@ -44,7 +44,7 @@ ${payload.code}
 `
 }
 
-function injectSource(source: string) {
+export function injectSource(source: string) {
   const script = document.createElement('script')
   script.textContent = source
 
@@ -56,7 +56,7 @@ function injectSource(source: string) {
 }
 
 /** Runs `callback` as soon as `<html>` exists — preload can beat the parser. */
-function whenDocumentElement(callback: () => void) {
+export function whenDocumentElement(callback: () => void) {
   if (document.documentElement) return callback()
 
   const observer = new MutationObserver(() => {
