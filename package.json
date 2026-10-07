@@ -24,14 +24,15 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@osm_borders/maritime_10m": "^1.1.0",
     "@shaderfrog/glsl-parser": "^0.2.2",
     "@supabase/supabase-js": "^2.44.4",
     "axios": "^1.7.2",
     "better-sqlite3": "^9.6.0",
-    "coordinate_to_country": "^1.1.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^8.2.0",
     "format-duration": "^3.0.2",
+    "geojson-geometries-lookup": "^0.5.0",
     "match-sorter": "^6.3.4",
     "sherpa-onnx-node": "^1.13.8",
     "socket.io-client": "^4.7.5",

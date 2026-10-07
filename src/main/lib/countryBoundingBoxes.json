@@ -230,5 +230,6 @@
 "TV":{"name":"Tuvalu","boundingBox":{"minLat":-10.9939389,"maxLat":-5.4369611,"minLng":-180,"maxLng":180}},
 "UM":{"name":"United States Minor Outlying Islands","boundingBox":{"minLat":6.1779744,"maxLat":6.6514388,"minLng":-162.6816297,"maxLng":-162.1339885}},
 "WF":{"name":"Wallis and Futuna","boundingBox":{"minLat":-14.5630748,"maxLat":-12.9827961,"minLng":-178.3873749,"maxLng":-175.9190391}},
-"EH":{"name":"Western Sahara","boundingBox":{"minLat":24.1597324,"maxLat":24.1997324,"minLng":-13.7867848,"maxLng":-13.7467848}}
+"EH":{"name":"Western Sahara","boundingBox":{"minLat":24.1597324,"maxLat":24.1997324,"minLng":-13.7867848,"maxLng":-13.7467848}},
+"XK":{"name":"Kosovo","boundingBox":{"minLat":41.8577,"maxLat":43.2689,"minLng":20.0141,"maxLng":21.7898}}
 }

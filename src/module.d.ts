@@ -31,7 +31,23 @@ declare module 'sherpa-onnx-node' {
   function readWave(filename: string, enableExternalBuffer?: boolean): Wave
 }
 
-declare module 'coordinate_to_country' {
-  function coordinate_to_country(lat: number, lng: number, isoA2?: boolean): string[]
-  export = coordinate_to_country
+/** OSM country borders including territorial waters, as a GeoJSON FeatureCollection. */
+declare module '@osm_borders/maritime_10m' {
+  const borders: {
+    type: 'FeatureCollection'
+    features: { type: 'Feature'; properties: { isoA2?: string; isoA3?: string }; geometry: any }[]
+  }
+  export = borders
+}
+
+declare module 'geojson-geometries-lookup' {
+  type Feature = { type: 'Feature'; properties: any; geometry: any }
+  class GeoJsonGeometriesLookup {
+    constructor(geoJson: { type: 'FeatureCollection'; features: Feature[] })
+    getContainers(
+      point: { type: 'Point'; coordinates: [number, number] },
+      options?: { limit?: number; ignorePoints?: boolean; ignoreLines?: boolean }
+    ): { type: 'FeatureCollection'; features: Feature[] }
+  }
+  export = GeoJsonGeometriesLookup
 }

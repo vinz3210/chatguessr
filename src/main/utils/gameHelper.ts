@@ -1,5 +1,5 @@
 import axios from 'axios'
-import countryIso from 'coordinate_to_country'
+import { getCountryCode } from './countryLookup'
 const { session } = require('electron')
 import countryBoundingBoxes from '../lib/countryBoundingBoxes.json'
 
@@ -78,8 +78,7 @@ export function compareLatLng(a: LatLng, b: LatLng) {
  * Get the country code for a coordinate.
  */
 export async function getStreakCode(location: LatLng): Promise<string | undefined> {
-  const localResults = countryIso(location.lat, location.lng, true)
-  const localIso = localResults.length > 0 ? localResults[0] : undefined
+  const localIso = getCountryCode(location.lat, location.lng)
   if (!localIso) return
 
   return streakCodes[localIso]
@@ -391,9 +390,9 @@ export async function getRandomCoordsInLandByCountryCode(countryCode: string, i:
   if (!bounds) return { lat: 0, lng: 0 }
   const lat = randomLatitudeInBounds(bounds.minLat, bounds.maxLat)
   const lng = Math.random() * (bounds.maxLng - bounds.minLng) + bounds.minLng
-  const localResults = countryIso(lat, lng, true)
-  console.log("lat: " + lat + " lng: " + lng + " localResults: " + localResults + " countryTheCountryCodeIsIn: " + countryTheCountryCodeIsIn)
-  if ((!localResults.length && i < 50) || (localResults[0]!=countryTheCountryCodeIsIn && i < 50)) return await getRandomCoordsInLandByCountryCode(countryCode, i + 1)
+  const localIso = getCountryCode(lat, lng)
+  console.log("lat: " + lat + " lng: " + lng + " localIso: " + localIso + " countryTheCountryCodeIsIn: " + countryTheCountryCodeIsIn)
+  if ((!localIso || streakCodes[localIso] != countryTheCountryCodeIsIn) && i < 50) return await getRandomCoordsInLandByCountryCode(countryCode, i + 1)
   return { lat, lng }
 
 }
@@ -412,8 +411,7 @@ export async function getRandomCoordsInLand(bounds: Bounds | null = null, i: num
   //const lat = Math.random() * (lat_north - lat_south) + lat_south
   const lat = randomLatitudeInBounds(lat_south, lat_north)
   const lng = Math.random() * (lng_east - lng_west) + lng_west
-  const localResults = countryIso(lat, lng, true)
-  if (!localResults.length && i < 50) return await getRandomCoordsInLand(bounds, i + 1)
+  if (!getCountryCode(lat, lng) && i < 50) return await getRandomCoordsInLand(bounds, i + 1)
   return { lat, lng }
 }
 export async function getRandomCoordsNotInLand(bounds: Bounds | null = null, i: number = 0): Promise<LatLng> {
@@ -429,14 +427,12 @@ export async function getRandomCoordsNotInLand(bounds: Bounds | null = null, i: 
   }
   const lat = randomLatitudeInBounds(lat_south, lat_north)
   const lng = Math.random() * (lng_east - lng_west) + lng_west
-  const localResults = countryIso(lat, lng, true)
-  if (localResults.length && i < 50) return await getRandomCoordsNotInLand(bounds, i + 1)
+  if (getCountryCode(lat, lng) && i < 50) return await getRandomCoordsNotInLand(bounds, i + 1)
   return { lat, lng }
 }
 
 export async function isCoordsInLand(location: LatLng): Promise<boolean> {
-  const localResults = countryIso(location.lat, location.lng, true)
-  return localResults.length > 0
+  return getCountryCode(location.lat, location.lng) !== undefined
 }
 
 export async function getStreamerAvatar(channel: string): Promise<{ avatar: string | undefined }> {

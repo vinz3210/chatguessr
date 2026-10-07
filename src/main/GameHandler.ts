@@ -5,7 +5,7 @@ import Game from './Game'
 import TwitchBackend from './utils/useTwitchJS'
 import { settings, saveSettings } from './utils/useSettings'
 import useAiDescription from './utils/useAiDescription'
-import countryIso from 'coordinate_to_country'
+import { getCountryCode } from './utils/countryLookup'
 
 import {
   isGameURL,
@@ -209,19 +209,19 @@ export default class GameHandler {
   }
 
   convertLatLngToCountdownName(lat: number, lng: number): string | boolean {
-    let countryIsos = countryIso(lat, lng, true)
+    const countryIso = getCountryCode(lat, lng)
     try{
-      if(countryIsos.length === 0){
+      if(!countryIso){
         return false
       }
-      let countryName = streakCodeCountdown.find(x=>x.code == streakCodes[countryIsos[0]]?.toLowerCase())
+      let countryName = streakCodeCountdown.find(x=>x.code == streakCodes[countryIso]?.toLowerCase())
       if (countryName === undefined) {
         return false
       }
       return countryName.names}
     catch{
       console.log("Error in convertLatLngToCountdownName")
-      console.log(countryIsos)
+      console.log(countryIso)
       return false
     }
   }

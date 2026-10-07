@@ -27,10 +27,29 @@ describe('getStreakCode', () => {
     const macao = { lat: 22.17174108804142, lng: 113.53648510492957 }
     await expect(GameHelper.getStreakCode(macao)).resolves.toBe('CN')
   })
-  it('counts Israel/Palestine as the same country', async () => {
+  it('counts Israel and Palestine as separate countries', async () => {
     const il = await GameHelper.getStreakCode({ lat: 32.034961561407215, lng: 34.75764745886409 })
-    const ps = await GameHelper.getStreakCode({ lat: 31.862835854507576, lng: 35.456499397290635 })
-    expect(il).toBe(ps)
+    const westBank = await GameHelper.getStreakCode({ lat: 31.862835854507576, lng: 35.456499397290635 })
+    const gaza = await GameHelper.getStreakCode({ lat: 31.5, lng: 34.45 })
+    expect(il).toBe('IL')
+    expect(westBank).toBe('PS')
+    expect(gaza).toBe('PS')
+  })
+  it('counts East Jerusalem as Palestine', async () => {
+    const oldCity = { lat: 31.7767, lng: 35.2345 }
+    const westJerusalem = { lat: 31.781, lng: 35.217 }
+    const mountScopus = { lat: 31.7925, lng: 35.244 }
+    expect(await GameHelper.getStreakCode(oldCity)).toBe('PS')
+    expect(await GameHelper.getStreakCode(westJerusalem)).toBe('IL')
+    expect(await GameHelper.getStreakCode(mountScopus)).toBe('IL')
+  })
+  it('counts the Golan Heights as Syria', async () => {
+    const katzrin = { lat: 32.99, lng: 35.69 }
+    const majdalShams = { lat: 33.27, lng: 35.77 }
+    const tiberias = { lat: 32.79, lng: 35.53 }
+    expect(await GameHelper.getStreakCode(katzrin)).toBe('SY')
+    expect(await GameHelper.getStreakCode(majdalShams)).toBe('SY')
+    expect(await GameHelper.getStreakCode(tiberias)).toBe('IL')
   })
   it('counts Åland as Finland', async () => {
     const aland = { lat: 60.41415638472204, lng: 20.309877225436857 }
@@ -67,6 +86,40 @@ describe('getStreakCode', () => {
   it('counts Llívia as spain', async () => {
     const es = { lat: 42.465134, lng: 1.976742 }
     expect(await GameHelper.getStreakCode(es)).toBe('ES')
+  })
+  it('counts Kosovo as its own country', async () => {
+    const pristina = { lat: 42.66, lng: 21.16 }
+    const belgrade = { lat: 44.82, lng: 20.46 }
+    expect(await GameHelper.getStreakCode(pristina)).toBe('XK')
+    expect(await GameHelper.getStreakCode(belgrade)).toBe('RS')
+  })
+  it('counts the Sovereign Base Areas on Cyprus as the UK', async () => {
+    const akrotiri = { lat: 34.6, lng: 32.95 }
+    const dhekelia = { lat: 34.99, lng: 33.75 }
+    const limassol = { lat: 34.68, lng: 33.04 }
+    expect(await GameHelper.getStreakCode(akrotiri)).toBe('GB')
+    expect(await GameHelper.getStreakCode(dhekelia)).toBe('GB')
+    expect(await GameHelper.getStreakCode(limassol)).toBe('CY')
+  })
+  it('counts the Cypriot enclaves inside Dhekelia as Cyprus', async () => {
+    const ormideia = { lat: 34.9939, lng: 33.7743 }
+    const xylotymbou = { lat: 35.0167, lng: 33.7421 }
+    const powerStation = { lat: 34.9847, lng: 33.7446 }
+    expect(await GameHelper.getStreakCode(ormideia)).toBe('CY')
+    expect(await GameHelper.getStreakCode(xylotymbou)).toBe('CY')
+    expect(await GameHelper.getStreakCode(powerStation)).toBe('CY')
+  })
+  it('resolves territories that only have an ISO3 code in the border data', async () => {
+    const curacao = { lat: 12.12, lng: -68.93 }
+    const bonaire = { lat: 12.15, lng: -68.27 }
+    const sintMaarten = { lat: 18.03, lng: -63.05 }
+    expect(await GameHelper.getStreakCode(curacao)).toBe('NL')
+    expect(await GameHelper.getStreakCode(bonaire)).toBe('NL')
+    expect(await GameHelper.getStreakCode(sintMaarten)).toBe('NL')
+  })
+  it('counts Crimea as Ukraine', async () => {
+    const simferopol = { lat: 44.95, lng: 34.1 }
+    expect(await GameHelper.getStreakCode(simferopol)).toBe('UA')
   })
 })
 
