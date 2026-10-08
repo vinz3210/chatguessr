@@ -168,10 +168,10 @@ export default function useTts(userDataPath: string, win: BrowserWindow) {
 
   const speakLocally = (id: string, text: string): TtsResult => {
     if (download || !isModelDownloaded(modelDir)) {
-      return { ok: false, error: 'Download the voice model in Settings → AI first.' }
+      return { ok: false, error: 'Download the voice model in Settings → Mode settings → Experimental → AI first.' }
     }
     if (!fs.existsSync(voicePath)) {
-      return { ok: false, error: 'Record or import your voice in Settings → AI first.' }
+      return { ok: false, error: 'Record or import your voice in Settings → Mode settings → Experimental → AI first.' }
     }
     activeIds.add(id)
     post({
@@ -238,10 +238,10 @@ export default function useTts(userDataPath: string, win: BrowserWindow) {
   const speakWithOpenRouter = (id: string, text: string): TtsResult => {
     const apiKey = store.get('openRouterApiKey')
     if (!apiKey) {
-      return { ok: false, error: 'No OpenRouter API key set. Add one in Settings → AI.' }
+      return { ok: false, error: 'No OpenRouter API key set. Add one in Settings → Mode settings → Experimental → AI.' }
     }
     if (!settings.ttsModel.trim()) {
-      return { ok: false, error: 'No voice model set. Pick one in Settings → AI.' }
+      return { ok: false, error: 'No voice model set. Pick one in Settings → Mode settings → Experimental → AI.' }
     }
     if (splitForSpeech(text).length === 0) return { ok: false, error: 'Nothing to read out.' }
     void runOpenRouterJob(id, apiKey, text)
@@ -250,7 +250,7 @@ export default function useTts(userDataPath: string, win: BrowserWindow) {
 
   ipcMain.handle('tts:speak', (_event, id: string, text: string): TtsResult => {
     if (!settings.ttsEnabled) {
-      return { ok: false, error: 'Read-aloud is turned off in Settings → AI.' }
+      return { ok: false, error: 'Read-aloud is turned off in Settings → Mode settings → Experimental → AI.' }
     }
     return settings.ttsProvider === 'local' ? speakLocally(id, text) : speakWithOpenRouter(id, text)
   })

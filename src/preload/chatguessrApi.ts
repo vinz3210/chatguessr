@@ -30,10 +30,6 @@ export const chatguessrApi = {
     return ipcRenderer.invoke('get-settings')
   },
 
-  getExperimentalModesEnabled(): Promise<boolean> {
-    return ipcRenderer.invoke('get-experimental-modes-enabled')
-  },
-
   saveSettings(settings: Settings) {
     ipcRenderer.send('save-settings', settings)
   },

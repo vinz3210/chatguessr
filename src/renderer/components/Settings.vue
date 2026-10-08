@@ -200,7 +200,88 @@
 
     
     <div v-show="currentTab === 'mode-settings'" class="content">
-      <ModeSettings :settings="settings" @reset="resetModeSettings" />
+      <ModeSettings
+        :settings="settings"
+        @reset="resetModeSettings"
+        @experimental-toggle="(open) => (experimentalOpen = open)"
+      >
+        <template #experimental>
+          <div class="experimental-ai">
+            <h2>AI Description Mode</h2>
+            <div class="ml-05">
+              <label
+                class="form__group"
+                data-tip="Hides the Street View and shows an AI-written description of it instead"
+              >
+                AI Description Mode
+                <input v-model="settings.aiDescriptionMode" type="checkbox" />
+              </label>
+              <div
+                class="form__group"
+                data-tip="Create a key at openrouter.ai/keys. It is only stored on this computer"
+              >
+                OpenRouter API key
+                {{ aiApiKeyStatus.isSet ? `(saved ${aiApiKeyStatus.hint})` : '(not set)' }} :
+                <div class="flex gap-02">
+                  <input
+                    v-model.trim="aiApiKeyInput"
+                    type="password"
+                    placeholder="sk-or-…"
+                    spellcheck="false"
+                    autocomplete="off"
+                    style="width: 200px"
+                    @keyup.enter="saveAiApiKey(aiApiKeyInput)"
+                  />
+                  <button
+                    class="btn bg-primary"
+                    :disabled="!aiApiKeyInput"
+                    @click="saveAiApiKey(aiApiKeyInput)"
+                  >
+                    Save
+                  </button>
+                  <button v-if="aiApiKeyStatus.isSet" class="btn bg-danger" @click="saveAiApiKey('')">
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <label
+                class="form__group"
+                data-tip="Any OpenRouter model that accepts images (default: google/gemini-3.8-flash)"
+              >
+                AI model{{ isKnownVisionModel ? '' : ' (not a known image model)' }} :
+                <input
+                  v-model.trim="settings.aiDescriptionModel"
+                  type="text"
+                  list="cg-ai-models"
+                  spellcheck="false"
+                  style="width: 260px"
+                />
+              </label>
+              <datalist id="cg-ai-models">
+                <option v-for="model of aiModels" :key="model.id" :value="model.id">
+                  {{ model.name }}
+                </option>
+              </datalist>
+            </div>
+
+            <hr />
+            <h2>AI voice <small>(reads AI descriptions aloud)</small></h2>
+            <LocalVoiceSettings
+              v-if="settings.ttsProvider === 'local'"
+              v-model:enabled="settings.ttsEnabled"
+            />
+            <SpeechSettings
+              v-else
+              v-model:enabled="settings.ttsEnabled"
+              v-model:model="settings.ttsModel"
+              v-model:voice="settings.ttsVoice"
+              :active="currentTab === 'mode-settings' && experimentalOpen"
+              :api-key-status="aiApiKeyStatus"
+            />
+          </div>
+
+        </template>
+      </ModeSettings>
       <div class="flex items-center flex-col gap-05 mt-1">
         <small>ChatGuessr version {{ currentVerion }}</small>
       </div>
@@ -407,135 +488,6 @@
       </div>
     </div>
 
-    <div
-      v-if="experimentalModesEnabled"
-      v-show="currentTab === 'experimental-modes'"
-      class="content"
-    >
-      <h2>Experimental modes</h2>
-      <div class="ml-05">
-        <label
-          class="form__group"
-          data-tip="Start each location fully zoomed in and reveal it over the CG timer duration. Guessing earlier preserves more of the time-sensitive points."
-        >
-          Progressive zoom mode
-          <input v-model="settings.progressiveZoomModeEnabled" type="checkbox" />
-        </label>
-        <label
-          class="form__group"
-          data-tip="How much of a 5,000-point accuracy score is affected by time. At 2,500, half stays fixed and half falls to zero over the CG timer duration."
-        >
-          Points affected by time
-          <input
-            v-model.number="settings.progressiveZoomAffectedPoints"
-            type="number"
-            min="0"
-            max="5000"
-            step="100"
-            :disabled="!settings.progressiveZoomModeEnabled"
-            @change="normalizeProgressiveZoomAffectedPoints"
-          />
-        </label>
-        <label
-          class="form__group"
-          data-tip="Let Twitch chat move, pan, zoom, and reset the view. Type !tmpz in chat for commands and short aliases. Round rules still apply."
-        >
-          Twitch moves, pans &amp; zooms (TMPZ)
-          <input v-model="settings.isTMPZModeEnabled" type="checkbox" />
-        </label>
-        <label
-          class="form__group"
-          data-tip="Cover the game view with a black mask and let chat move the circular opening. Type !peephole in chat for commands."
-        >
-          Peephole mode
-          <input v-model="settings.peepholeModeEnabled" type="checkbox" />
-        </label>
-        <label class="form__group" data-tip="Size of the visible circle">
-          Peephole size
-          <select v-model="settings.peepholeSize" :disabled="!settings.peepholeModeEnabled">
-            <option value="tiny">Tiny</option>
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-          </select>
-        </label>
-      </div>
-    </div>
-
-    <div v-if="experimentalModesEnabled" v-show="currentTab === 'ai-settings'" class="content">
-      <h2>AI Description Mode</h2>
-      <div class="ml-05">
-        <label
-          class="form__group"
-          data-tip="Hides the Street View and shows an AI-written description of it instead"
-        >
-          AI Description Mode
-          <input v-model="settings.aiDescriptionMode" type="checkbox" />
-        </label>
-        <div
-          class="form__group"
-          data-tip="Create a key at openrouter.ai/keys. It is only stored on this computer"
-        >
-          OpenRouter API key
-          {{ aiApiKeyStatus.isSet ? `(saved ${aiApiKeyStatus.hint})` : '(not set)' }} :
-          <div class="flex gap-02">
-            <input
-              v-model.trim="aiApiKeyInput"
-              type="password"
-              placeholder="sk-or-…"
-              spellcheck="false"
-              autocomplete="off"
-              style="width: 200px"
-              @keyup.enter="saveAiApiKey(aiApiKeyInput)"
-            />
-            <button
-              class="btn bg-primary"
-              :disabled="!aiApiKeyInput"
-              @click="saveAiApiKey(aiApiKeyInput)"
-            >
-              Save
-            </button>
-            <button v-if="aiApiKeyStatus.isSet" class="btn bg-danger" @click="saveAiApiKey('')">
-              Remove
-            </button>
-          </div>
-        </div>
-        <label
-          class="form__group"
-          data-tip="Any OpenRouter model that accepts images (default: google/gemini-3.8-flash)"
-        >
-          AI model{{ isKnownVisionModel ? '' : ' (not a known image model)' }} :
-          <input
-            v-model.trim="settings.aiDescriptionModel"
-            type="text"
-            list="cg-ai-models"
-            spellcheck="false"
-            style="width: 260px"
-          />
-        </label>
-        <datalist id="cg-ai-models">
-          <option v-for="model of aiModels" :key="model.id" :value="model.id">
-            {{ model.name }}
-          </option>
-        </datalist>
-      </div>
-
-      <hr />
-      <h2>AI voice <small>(reads AI descriptions aloud)</small></h2>
-      <LocalVoiceSettings
-        v-if="settings.ttsProvider === 'local'"
-        v-model:enabled="settings.ttsEnabled"
-      />
-      <SpeechSettings
-        v-else
-        v-model:enabled="settings.ttsEnabled"
-        v-model:model="settings.ttsModel"
-        v-model:voice="settings.ttsVoice"
-        :active="currentTab === 'ai-settings'"
-        :api-key-status="aiApiKeyStatus"
-      />
-    </div>
-
     <div v-show="currentTab === 'userscripts'" class="content">
       <h2>Userscripts <small>(Tampermonkey compatible)</small></h2>
       <Userscripts />
@@ -589,19 +541,13 @@ const { socketConnectionState, twitchConnectionState } = defineProps<{
 const currentTab = shallowRef(
   twitchConnectionState.state === 'disconnected' ? 'twitch-connect' : 'game-settings'
 )
-const experimentalModesEnabled = await chatguessrApi.getExperimentalModesEnabled()
+const experimentalOpen = shallowRef(false)
 const tabs = [
   { name: 'game-settings', value: 'Game settings' },
   { name: 'mode-settings', value: 'Mode settings' },
   { name: 'twitch-connect', value: 'Twitch connect' },
   { name: 'ban-list', value: 'Ban list' },
   { name: 'messages', value: 'Messages' },
-  ...(experimentalModesEnabled
-    ? [
-        { name: 'experimental-modes', value: 'Experimental' },
-        { name: 'ai-settings', value: 'AI' }
-      ]
-    : []),
   { name: 'userscripts', value: 'Userscripts' }
 ]
 
@@ -655,12 +601,12 @@ const saveAiApiKey = async (apiKey: string) => {
   aiApiKeyInput.value = ''
 }
 
-// Fetched from OpenRouter only when someone opens the AI tab.
+// Fetch model lists only when the experimental section is visible.
 const aiModels = shallowRef<AiModelOption[]>([])
 watch(
-  currentTab,
-  async (tab) => {
-    if (experimentalModesEnabled && tab === 'ai-settings' && aiModels.value.length === 0) {
+  () => currentTab.value === 'mode-settings' && experimentalOpen.value,
+  async (active) => {
+    if (active && aiModels.value.length === 0) {
       aiModels.value = await chatguessrApi.getAiVisionModels()
     }
   },
@@ -674,6 +620,13 @@ const isKnownVisionModel = computed(
 
 const resetModeSettings = () => {
   // Reset all mode settings to their default values
+  settings.isTMPZModeEnabled = false
+  settings.peepholeModeEnabled = false
+  settings.peepholeSize = 'small'
+  settings.progressiveZoomModeEnabled = false
+  settings.progressiveZoomAffectedPoints = 5000
+  settings.aiDescriptionMode = false
+  settings.ttsEnabled = false
   settings.isClosestInWrongCountryModeActivated = false
   settings.invertScoring = false
   settings.exclusiveMode = false
@@ -694,13 +647,6 @@ const resetModeSettings = () => {
   settings.ABCModeLetters = "ABCDE"
   settings.waterPlonkMode = "normal"
   settings.modifierMinusPointsIfWrongCountry = 0
-}
-
-function normalizeProgressiveZoomAffectedPoints() {
-  const points = Number(settings.progressiveZoomAffectedPoints)
-  settings.progressiveZoomAffectedPoints = Number.isFinite(points)
-    ? Math.max(0, Math.min(5000, Math.round(points)))
-    : 5000
 }
 
 </script>

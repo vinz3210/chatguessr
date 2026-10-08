@@ -169,16 +169,100 @@
         description="Allow deductions to take a score below zero."
       />
     </div>
+
+    <details class="experimental-section" @toggle="onExperimentalToggle">
+      <summary>
+        <span>Experimental features</span>
+        <span class="experimental-label">Experimental</span>
+        <span v-if="experimentalCount" class="experimental-count">
+          {{ experimentalCount }} active
+        </span>
+      </summary>
+      <div class="experimental-content">
+        <p class="option-hint">Optional modes and AI tools. Expand a mode by enabling it.</p>
+        <div class="mode-grid experimental-grid">
+          <ModeCard
+            v-model:enabled="settings.progressiveZoomModeEnabled"
+            title="Progressive zoom"
+            description="Start zoomed in and reveal the view over the CG timer. Earlier guesses preserve more points."
+          >
+            <label class="form__group">
+              Points affected by time
+              <input
+                v-model.number="settings.progressiveZoomAffectedPoints"
+                type="number"
+                min="0"
+                max="5000"
+                step="100"
+                @change="normalizeProgressiveZoomAffectedPoints"
+              />
+            </label>
+            <p class="option-hint">
+              At 2,500, half the accuracy score stays fixed and half falls with time.
+            </p>
+          </ModeCard>
+          <ModeCard
+            v-model:enabled="settings.isTMPZModeEnabled"
+            title="TMPZ"
+            description="Let Twitch chat move, pan, zoom, and reset the view. Type !tmpz for commands."
+          />
+          <ModeCard
+            v-model:enabled="settings.peepholeModeEnabled"
+            title="Peephole"
+            description="Hide the view behind a mask. Chat moves a circular opening with !peephole commands."
+          >
+            <label class="form__group">
+              Opening size
+              <select v-model="settings.peepholeSize">
+                <option value="tiny">Tiny</option>
+                <option value="small">Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large</option>
+              </select>
+            </label>
+          </ModeCard>
+        </div>
+        <div v-if="experimentalOpen" class="ai-settings">
+          <slot name="experimental" />
+        </div>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 import ModeCard from './ui/ModeCard.vue'
 
 const props = defineProps<{ settings: Settings }>()
 const settings = props.settings
-defineEmits<{ (event: 'reset'): void }>()
+const emit = defineEmits<{
+  (event: 'reset'): void
+  (event: 'experimental-toggle', open: boolean): void
+}>()
+const experimentalOpen = shallowRef(false)
+const experimentalCount = computed(
+  () =>
+    [
+      settings.progressiveZoomModeEnabled,
+      settings.isTMPZModeEnabled,
+      settings.peepholeModeEnabled,
+      settings.aiDescriptionMode,
+      settings.ttsEnabled
+    ].filter(Boolean).length
+)
+
+function onExperimentalToggle(event: Event) {
+  experimentalOpen.value = (event.target as HTMLDetailsElement).open
+  emit('experimental-toggle', experimentalOpen.value)
+}
+
+function normalizeProgressiveZoomAffectedPoints() {
+  const points = Number(settings.progressiveZoomAffectedPoints)
+  settings.progressiveZoomAffectedPoints = Number.isFinite(points)
+    ? Math.max(0, Math.min(5000, Math.round(points)))
+    : 5000
+}
 
 const sequenceNames: Record<string, string> = {
   countdown: 'Countdown',
@@ -217,6 +301,11 @@ const activeRules = computed(() => {
     rules.push(`Wrong country adjustment · ${settings.modifierMinusPointsIfWrongCountry}`)
   }
   if (settings.allowMinus) rules.push('Negative scores')
+  if (settings.progressiveZoomModeEnabled) rules.push('Progressive zoom · Experimental')
+  if (settings.isTMPZModeEnabled) rules.push('TMPZ · Experimental')
+  if (settings.peepholeModeEnabled) rules.push('Peephole · Experimental')
+  if (settings.aiDescriptionMode) rules.push('AI descriptions · Experimental')
+  if (settings.ttsEnabled) rules.push('AI voice · Experimental')
   return rules
 })
 
@@ -312,6 +401,50 @@ function onlyLetters(event: KeyboardEvent) {
 
 .option-hint {
   margin-top: 0.5rem;
+}
+
+.experimental-section {
+  margin-top: 1.5rem;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 10px;
+}
+
+.experimental-section summary {
+  padding: 1rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.experimental-label,
+.experimental-count {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.experimental-label {
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  color: var(--warning);
+  background: rgb(255 255 255 / 8%);
+}
+
+.experimental-count {
+  color: var(--primary);
+}
+
+.experimental-content {
+  padding: 0 1rem 1rem;
+}
+
+.experimental-grid {
+  margin-top: 0.75rem;
+}
+
+.ai-settings {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgb(255 255 255 / 12%);
 }
 
 @media (max-width: 650px) {

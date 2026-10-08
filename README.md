@@ -19,22 +19,13 @@ Want to support the project? Go to <a href="https://chatguessr.com">the official
 
 ### Experimental modes and AI
 
-TMPZ, peephole, progressive zoom, and AI features are hidden and inactive by default. Start ChatGuessr with
-`--experimental-modes` to reveal the **Experimental** tab (TMPZ, peephole, progressive zoom, and
-its points affected by time setting) and the **AI** tab
-(descriptions, OpenRouter API key, model selection, and voice settings).
+TMPZ, peephole, progressive zoom, and AI features are available under **Mode settings →
+Experimental features**, a section that starts collapsed. AI descriptions, the OpenRouter API
+key, model selection, and voice settings are grouped together inside that section.
 
-For an installed app, launch its executable from a terminal, for example in PowerShell:
-
-```powershell
-& "C:\path\to\ChatGuessr.exe" --experimental-modes
-```
-
-From the source checkout, use `npm run dev:experimental`. The equivalent Forge command is
-`npx electron-forge start -- --experimental-modes`.
-
-The flag makes these settings available; each mode still has its own toggle. Launching without
-the flag disables these features for that session and preserves their saved configuration.
+Start normally with `npm run dev`; no startup flag is needed. Each feature has its own toggle,
+and collapsing the section does not turn enabled features off. Active experimental features
+are included in the active rules summary.
 
 ### Game of Chicken 🐔
 The winner of the previous round scores 0 points in the next round — unless they 5k. Last round is always free.

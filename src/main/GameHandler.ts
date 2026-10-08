@@ -4,7 +4,6 @@ import { io } from 'socket.io-client'
 import Game from './Game'
 import TwitchBackend from './utils/useTwitchJS'
 import { settings, saveSettings } from './utils/useSettings'
-import { experimentalModesEnabled } from './utils/experimentalModes'
 import useAiDescription from './utils/useAiDescription'
 import { getCountryCode } from './utils/countryLookup'
 
@@ -677,7 +676,6 @@ export default class GameHandler {
     ipcMain.handle('get-settings', () => {
       return settings
     })
-    ipcMain.handle('get-experimental-modes-enabled', () => experimentalModesEnabled)
     ipcMain.handle('start-progressive-zoom-round', (_event, timeLimit: number, panoramaReadyAt?: number) => {
       return this.#game.startProgressiveZoomRound(timeLimit, panoramaReadyAt)
     })
@@ -1494,13 +1492,9 @@ export default class GameHandler {
     }
     
     if (message === '!peephole' || message === '!ph') {
-      const status = settings.peepholeModeEnabled
-        ? 'on'
-        : experimentalModesEnabled
-          ? 'off (enable in Experimental settings)'
-          : 'off (start ChatGuessr with --experimental-modes to enable)'
+      const status = settings.peepholeModeEnabled ? 'on' : 'off (enable in Mode settings → Experimental)'
       await this.#backend?.sendMessage(
-        `Peephole ${status}: !ph up/down/left/right moves the circle 10% of the screen; !ph u/d/l/r are shortcuts; !ph center (or !ph c) recenters it. Size: Tiny, Small, Medium, or Large in Experimental settings.`
+        `Peephole ${status}: !ph up/down/left/right moves the circle 10% of the screen; !ph u/d/l/r are shortcuts; !ph center (or !ph c) recenters it. Size: Tiny, Small, Medium, or Large in Mode settings → Experimental.`
       )
       return
     }
@@ -1522,11 +1516,7 @@ export default class GameHandler {
     }
 
     if (message === '!tmpz') {
-      const status = settings.isTMPZModeEnabled
-        ? 'on'
-        : experimentalModesEnabled
-          ? 'off (enable in Experimental settings)'
-          : 'off (start ChatGuessr with --experimental-modes to enable)'
+      const status = settings.isTMPZModeEnabled ? 'on' : 'off (enable in Mode settings → Experimental)'
       await this.#backend?.sendMessage(
         `TMPZ ${status}: !mf forward, !mb back; !pl/!pr left/right, !pu/!pd up/down (45° default; e.g. !pu 20); !zi/!zo zoom in/out (1 default; disabled during progressive zoom); !rs reset to round start. Full commands also work. 5s cooldown per user; round rules apply.`
       )

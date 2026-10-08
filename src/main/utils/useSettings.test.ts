@@ -15,16 +15,12 @@ const { saved, store } = vi.hoisted(() => {
 
 vi.mock('./store', () => ({ store }))
 
-async function launch(enabled: boolean) {
+async function launch() {
   vi.resetModules()
-  vi.doMock('./experimentalModes', async (importOriginal) => ({
-    ...(await importOriginal<typeof import('./experimentalModes')>()),
-    experimentalModesEnabled: enabled
-  }))
   return import('./useSettings')
 }
 
-describe('experimental settings across launches', () => {
+describe('experimental settings in normal launches', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     saved.settings = {
@@ -40,43 +36,40 @@ describe('experimental settings across launches', () => {
     }
   })
 
-  it('keeps hidden modes inactive and restores their saved choices on a flagged launch', async () => {
-    const normal = await launch(false)
-    expect(normal.settings.isTMPZModeEnabled).toBe(false)
-    expect(normal.settings.peepholeModeEnabled).toBe(false)
-    expect(normal.settings.progressiveZoomModeEnabled).toBe(false)
-    expect(normal.settings.aiDescriptionMode).toBe(false)
-    expect(normal.settings.ttsEnabled).toBe(false)
-
-    normal.saveSettings({ ...normal.settings, guessMarkersLimit: 50, aiDescriptionMode: true })
-    expect(normal.settings.aiDescriptionMode).toBe(false)
-    expect(saved.settings.guessMarkersLimit).toBe(50)
-
-    const experimental = await launch(true)
-    expect(experimental.settings.isTMPZModeEnabled).toBe(true)
-    expect(experimental.settings.peepholeModeEnabled).toBe(true)
-    expect(experimental.settings.progressiveZoomModeEnabled).toBe(true)
-    expect(experimental.settings.progressiveZoomAffectedPoints).toBe(2500)
-    expect(experimental.settings.aiDescriptionMode).toBe(true)
-    expect(experimental.settings.ttsEnabled).toBe(true)
-    expect(experimental.settings.peepholeSize).toBe('large')
-    expect(experimental.settings.aiDescriptionModel).toBe('saved-vision-model')
-    expect(experimental.settings.ttsVoice).toBe('saved-voice')
-    expect(experimental.settings.guessMarkersLimit).toBe(50)
+  it('restores saved experimental choices without a startup flag', async () => {
+    const app = await launch()
+    expect(app.settings.isTMPZModeEnabled).toBe(true)
+    expect(app.settings.peepholeModeEnabled).toBe(true)
+    expect(app.settings.progressiveZoomModeEnabled).toBe(true)
+    expect(app.settings.aiDescriptionMode).toBe(true)
+    expect(app.settings.ttsEnabled).toBe(true)
+    expect(app.settings.progressiveZoomAffectedPoints).toBe(2500)
+    expect(app.settings.aiDescriptionModel).toBe('saved-vision-model')
+    expect(app.settings.ttsVoice).toBe('saved-voice')
   })
 
-  it('saves experimental mode changes when the flag is enabled', async () => {
-    const experimental = await launch(true)
-    experimental.saveSettings({
-      ...experimental.settings,
-      isTMPZModeEnabled: false,
+  it('saves experimental changes and ordinary settings together', async () => {
+    const app = await launch()
+    app.saveSettings({
+      ...app.settings,
+      guessMarkersLimit: 50,
       progressiveZoomModeEnabled: false,
       progressiveZoomAffectedPoints: 1000
     })
-    const restarted = await launch(true)
-    expect(restarted.settings.isTMPZModeEnabled).toBe(false)
-    expect(restarted.settings.peepholeModeEnabled).toBe(true)
+    const restarted = await launch()
+    expect(restarted.settings.guessMarkersLimit).toBe(50)
     expect(restarted.settings.progressiveZoomModeEnabled).toBe(false)
     expect(restarted.settings.progressiveZoomAffectedPoints).toBe(1000)
+    expect(restarted.settings.isTMPZModeEnabled).toBe(true)
+  })
+
+  it('leaves experimental features off for a fresh configuration', async () => {
+    saved.settings = {}
+    const app = await launch()
+    expect(app.settings.isTMPZModeEnabled).toBe(false)
+    expect(app.settings.peepholeModeEnabled).toBe(false)
+    expect(app.settings.progressiveZoomModeEnabled).toBe(false)
+    expect(app.settings.aiDescriptionMode).toBe(false)
+    expect(app.settings.ttsEnabled).toBe(false)
   })
 })
