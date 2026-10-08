@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { store } from './store'
 import { settings } from './useSettings'
+import { experimentalModesEnabled } from './experimentalModes'
 import {
   askAboutPanorama,
   describePanorama,
@@ -48,11 +49,14 @@ export default function useAiDescription(getLocation: () => Location_ | undefine
 
   // Why a request can't be made, or null when it can.
   const missingSetup = () => {
+    if (!experimentalModesEnabled) {
+      return 'Start ChatGuessr with --experimental-modes to use AI descriptions.'
+    }
     if (!store.get('openRouterApiKey')) {
-      return 'No OpenRouter API key set. Add one in Settings → Mode settings.'
+      return 'No OpenRouter API key set. Add one in Settings → AI.'
     }
     if (!settings.aiDescriptionModel.trim()) {
-      return 'No AI model set. Pick one in Settings → Mode settings.'
+      return 'No AI model set. Pick one in Settings → AI.'
     }
     return null
   }

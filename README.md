@@ -17,6 +17,25 @@ Want to support the project? Go to <a href="https://chatguessr.com">the official
 
 ## Game Modes
 
+### Experimental modes and AI
+
+TMPZ, peephole, progressive zoom, and AI features are hidden and inactive by default. Start ChatGuessr with
+`--experimental-modes` to reveal the **Experimental** tab (TMPZ, peephole, progressive zoom, and
+its points affected by time setting) and the **AI** tab
+(descriptions, OpenRouter API key, model selection, and voice settings).
+
+For an installed app, launch its executable from a terminal, for example in PowerShell:
+
+```powershell
+& "C:\path\to\ChatGuessr.exe" --experimental-modes
+```
+
+From the source checkout, use `npm run dev:experimental`. The equivalent Forge command is
+`npx electron-forge start -- --experimental-modes`.
+
+The flag makes these settings available; each mode still has its own toggle. Launching without
+the flag disables these features for that session and preserves their saved configuration.
+
 ### Game of Chicken 🐔
 The winner of the previous round scores 0 points in the next round — unless they 5k. Last round is always free.
 

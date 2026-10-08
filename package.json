@@ -12,6 +12,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "npm run typecheck && electron-forge start",
+    "dev:experimental": "npm run typecheck && electron-forge start -- --experimental-modes",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "typecheck:node": "tsc -p tsconfig.node.json",
     "typecheck:web": "vue-tsc -p tsconfig.web.json",

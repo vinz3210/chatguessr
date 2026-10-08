@@ -200,336 +200,11 @@
 
     
     <div v-show="currentTab === 'mode-settings'" class="content">
-  
-  <h2>Mode Settings</h2>
-  <div class="ml-05">
-    <label
-      class="form__group"
-      data-tip="Let Twitch chat move, pan, zoom, and reset the view. Type !tmpz in chat for commands and short aliases. Round rules still apply."
-    >
-      Twitch moves, pans &amp; zooms (TMPZ)
-      <input v-model="settings.isTMPZModeEnabled" type="checkbox" />
-    </label>
-    <label class="form__group" data-tip="Start each location fully zoomed in and reveal it over the CG timer duration. Guessing earlier preserves more of the time-sensitive points.">
-      Progressive zoom mode
-      <input v-model="settings.progressiveZoomModeEnabled" type="checkbox" />
-    </label>
-    <label class="form__group" data-tip="How much of a 5,000-point accuracy score is affected by time. At 2,500, half stays fixed and half falls to zero over the CG timer duration.">
-      Points affected by time
-      <input v-model.number="settings.progressiveZoomAffectedPoints" type="number" min="0" max="5000" step="100" :disabled="!settings.progressiveZoomModeEnabled" @change="normalizeProgressiveZoomAffectedPoints" />
-    </label>
-    <label
-      class="form__group"
-      data-tip="Cover the game view with a black mask and let chat move the circular opening. Type !peephole in chat for commands."
-    >
-      Peephole mode
-      <input v-model="settings.peepholeModeEnabled" type="checkbox" />
-    </label>
-    <label class="form__group" data-tip="Size of the visible circle">
-      Peephole size
-      <select v-model="settings.peepholeSize" :disabled="!settings.peepholeModeEnabled">
-        <option value="tiny">Tiny</option>
-        <option value="small">Small</option>
-        <option value="medium">Medium</option>
-        <option value="large">Large</option>
-      </select>
-    </label>
-    <label
-      class="form__group"
-      data-tip="Wrong country mode"
-    >
-      Wrong country mode
-      <input v-model="settings.isClosestInWrongCountryModeActivated" type="checkbox" />
-    </label>
-    
-    <label
-        class="form__group"
-        data-tip="Antipode Mode (only normal scoring World Maps)"
-      >
-      Antipode Mode (only normal scoring World Maps)
-        <input v-model="settings.invertScoring" type="checkbox" />
-      </label>
-
-    
-      <label
-      class="form__group"
-      data-tip="Exclusive mode"
-    >
-    Exclusive mode
-      <input v-model="settings.exclusiveMode" type="checkbox" />
-    </label>
-      
-    <label
-      class="form__group"
-      data-tip="Allow Minus Points"
-    >
-        Allow Minus Points (on BR Subtract Points)
-        <input v-model="settings.allowMinus" type="checkbox" />
-      </label>
-
-        
-      <div>
-        <h2>Multis Settings</h2>
-        <label class="form__group" data-tip="Off">
-          Off
-          <input type="radio" v-model="settings.roundMultis" value="off" />
-        </label>
-        <label class="form__group" data-tip="Multi Merchant">
-          Multi Merchant
-          <input type="radio" v-model="settings.roundMultis" value="multiMerchant" />
-        </label>
-        <label class="form__group" data-tip="Random">
-          Random
-          <input type="radio" v-model="settings.roundMultis" value="random" />
-        </label>
-        </div>
-        <!-- checkbox for only showing the randomMultis on end of the round if roundMultis is enabled-->
-        <label
-        v-show="settings.roundMultis === 'random'"
-          :class="{ 'form__group__disabled' : settings.roundMultis !== 'random'}"
-          class="form__group"
-          data-tip="Only show random multis at end of round"
-        >
-          Only show random multis at end of round
-          <input v-model="settings.showRandomMultisOnlyAtEndOfRound" type="checkbox" />
-        </label>
-
-  
-    <hr />
-    <h2>Game of Chicken Settings</h2>
-
-    <label
-      class="form__group"
-      data-tip="Game of Chicken 🐔"
-    >
-      Game of Chicken (Closest Plonk gets 0 Points on next round)
-      <input v-model="settings.isGameOfChickenModeActivated" type="checkbox" />
-    </label>
-
-    <label
-      class="form__group"
-      :class="{ 'form__group__disabled' : settings.isGameOfChickenModeActivated === false}"
-      data-tip="5k bypasses loss of score, meaning that the player closest without a 5k is the one penalized next round"
-    >
-      Getting a 5k bypasses the loss of score next round
-      <input v-model="settings.chickenModeSurvivesWith5k" type="checkbox" :disabled="!settings.isGameOfChickenModeActivated"/>
-    </label>
-
-    <label
-      class="form__group"
-      :class="{ 'form__group__disabled' : settings.isGameOfChickenModeActivated === false}"
-      data-tip="5k always gives points, even if the player was closest last round"
-    >
-      Getting a 5k always give points
-      <input v-model="settings.chickenMode5kGivesPoints" type="checkbox" :disabled="!settings.isGameOfChickenModeActivated"/>
-    </label>
-    
-    <hr />
-    <h2>Darts Settings</h2>
-
-    <label
-      class="form__group"
-      data-tip="Darts mode"
-    >
-      Darts Mode
-      <input v-model="settings.isDartsMode" type="checkbox" />
-    </label>
-    <label
-      class="form__group"
-      :class="{ 'form__group__disabled' : settings.isDartsMode === false}"
-      data-tip="Darts mode Bust"
-    >
-      Activate Bust
-      <input v-model="settings.isDartsModeBust" type="checkbox" :disabled="!settings.isDartsMode"/>
-    </label>
-    
-    <label 
-      class="form__group"
-      :class="{ 'form__group__disabled' : settings.isDartsMode === false}" 
-      data-tip="Target Score">
-      Darts Target Score :
-      <input v-model.trim="settings.dartsTargetScore" type="text" spellcheck="false" :disabled="!settings.isDartsMode"/>
-    </label>
-    
-    <hr />
-
-    <h2>Battle Royale Settings</h2>
-
-    <label
-      class="form__group"
-      data-tip="Reguess Mode"
-    >
-      Reguess Mode (deactivates Multi Guess)
-      <input v-model="settings.isBRMode" @change="modifyIsMultiGusssOnBRMode" type="checkbox" />
-    </label>
-    
-    <label 
-      class="form__group"
-      :class="{ 'form__group__disabled' : settings.isBRMode === false}" 
-      data-tip="Max Lives">
-      Maximum Number of Guess Changes Per Round:
-      <input v-model.trim="settings.battleRoyaleReguessLimit" type="text" spellcheck="false" :disabled="!settings.isBRMode"/>
-    </label>
-
-
-    <label 
-      class="form__group"
-      :class="{ 'form__group__disabled' : settings.isBRMode === false}" 
-      data-tip="Subtrated Points per Guess">
-      Number of Points subtracted per Guess:
-      <input v-model.trim="settings.battleRoyaleSubtractedPoints" type="text" spellcheck="false" :disabled="!settings.isBRMode"/>
-    </label>
-
-    <hr />
-    <div>
-      <h2>Lat/Lng Mode</h2>
-      <div class="ml-05">
-        <label class="form__group" data-tip="Off - normal GeoGuessr scoring">
-          Off
-          <input type="radio" v-model="settings.scoringMode" value="off" />
-        </label>
-        <label class="form__group" data-tip="Score only based on the latitude difference. If the target is in the Philippines and you click Colombia, you still score points because the latitude matches">
-          Latitude
-          <input type="radio" v-model="settings.scoringMode" value="latitude" />
-        </label>
-        <label class="form__group" data-tip="Score only based on the longitude difference">
-          Longitude
-          <input type="radio" v-model="settings.scoringMode" value="longitude" />
-        </label>
-        <label class="form__group" data-tip="Score based on both axes. Latitude and Longitude each contribute up to 2500 points with the normal curve, total capped at 5000">
-          Lat/Lng
-          <input type="radio" v-model="settings.scoringMode" value="latlng" />
-        </label>
+      <ModeSettings :settings="settings" @reset="resetModeSettings" />
+      <div class="flex items-center flex-col gap-05 mt-1">
+        <small>ChatGuessr version {{ currentVerion }}</small>
       </div>
     </div>
-
-    <hr />
-    <h2>AI Description Mode</h2>
-    <div class="ml-05">
-      <label
-        class="form__group"
-        data-tip="Hides the Street View and shows an AI-written description of it instead"
-      >
-        AI Description Mode
-        <input v-model="settings.aiDescriptionMode" type="checkbox" />
-      </label>
-      <div
-        class="form__group"
-        data-tip="Create a key at openrouter.ai/keys. It is only stored on this computer"
-      >
-        OpenRouter API key {{ aiApiKeyStatus.isSet ? `(saved ${aiApiKeyStatus.hint})` : '(not set)' }} :
-        <div class="flex gap-02">
-          <input
-            v-model.trim="aiApiKeyInput"
-            type="password"
-            placeholder="sk-or-…"
-            spellcheck="false"
-            autocomplete="off"
-            style="width: 200px"
-            @keyup.enter="saveAiApiKey(aiApiKeyInput)"
-          />
-          <button
-            class="btn bg-primary"
-            :disabled="!aiApiKeyInput"
-            @click="saveAiApiKey(aiApiKeyInput)"
-          >
-            Save
-          </button>
-          <button v-if="aiApiKeyStatus.isSet" class="btn bg-danger" @click="saveAiApiKey('')">
-            Remove
-          </button>
-        </div>
-      </div>
-      <label
-        class="form__group"
-        data-tip="Any OpenRouter model that accepts images (default: google/gemini-3.8-flash)"
-      >
-        AI model{{ isKnownVisionModel ? '' : ' (not a known image model)' }} :
-        <input
-          v-model.trim="settings.aiDescriptionModel"
-          type="text"
-          list="cg-ai-models"
-          spellcheck="false"
-          style="width: 260px"
-        />
-      </label>
-      <datalist id="cg-ai-models">
-        <option v-for="model of aiModels" :key="model.id" :value="model.id">{{ model.name }}</option>
-      </datalist>
-    </div>
-
-    <hr />
-    <div class="grid-col">
-      <div>
-        <h2>Countdown /-up / ABC / Alphabet Settings</h2>
-        <label class="form__group" data-tip="Standard Mode">
-          Standard Mode
-          <input type="radio" v-model="settings.countdownMode" value="normal" />
-        </label>
-        <label class="form__group" data-tip="Countdown">
-          Countdown
-          <input type="radio" v-model="settings.countdownMode" value="countdown" />
-        </label>
-
-        <label class="form__group" data-tip="Countup">
-          Countup
-          <input type="radio" v-model="settings.countdownMode" value="countup" />
-        </label>
-        <label class="form__group" data-tip="Alphabetical A=>Z">
-          Alphabetical A=>Z
-          <input type="radio" v-model="settings.countdownMode" value="alphabeticalAZ" />
-        </label>
-        <label class="form__group" data-tip="Alphabetical Z=>A">
-          Alphabetical Z=>A
-          <input type="radio" v-model="settings.countdownMode" value="alphabeticalZA" />
-        </label>
-        <label class="form__group" data-tip="ABC">
-          ABC
-          <input type="radio" v-model="settings.countdownMode" value="abc" />
-        </label>
-                    
-        <label class="form__group" data-tip="Letters for ABC Mode">
-              Letters for ABC Mode:
-              <input v-model.trim="settings.ABCModeLetters" v-on:keypress="isLetter($event)"type="text" spellcheck="false" :disabled="settings.countdownMode!='abc'" />
-            </label>
-
-      </div>
-      <div>
-        <h2>Ocean Plonk Settings</h2>
-        <label class="form__group" data-tip="0 Points for Plonks on Land">
-          Only Ocean Plonk Mode
-          <input type="radio" v-model="settings.waterPlonkMode" value="mandatory" />
-        </label>
-        <label class="form__group" data-tip="Standard Mode">
-          Normal Ocean Plonk Mode
-          <input type="radio" v-model="settings.waterPlonkMode" value="normal" />
-        </label>
-        <label class="form__group" data-tip="0 Points for Plonks in international Waters">
-          Ocean Plonks Illegal Mode
-          <input type="radio" v-model="settings.waterPlonkMode" value="illegal" />
-        </label>
-        <hr />
-        <h2>Score Modifiers minus points if wrong country</h2>
-        <label class="form__group" data-tip="Minus Points if wrong Country">
-          Score Modifier minus points if wrong country
-          <input v-model="settings.modifierMinusPointsIfWrongCountry" type="number" />
-        </label>
-      </div>
-    </div>
-
-    <hr />
-    <div class="flex items-center flex-col gap-05 mt-1">
-      <button class="btn bg-warning" @click="resetModeSettings()">
-        Reset Mode Settings to Default
-      </button>
-    </div>
-
-  </div>
-
-  <div class="flex items-center flex-col gap-05 mt-1">
-    <small>ChatGuessr version {{ currentVerion }}</small>
-  </div>
-</div>
 
     <div v-show="currentTab === 'messages'" class="content">
   
@@ -732,7 +407,120 @@
       </div>
     </div>
 
-    <div v-show="currentTab === 'ai-voice'" class="content">
+    <div
+      v-if="experimentalModesEnabled"
+      v-show="currentTab === 'experimental-modes'"
+      class="content"
+    >
+      <h2>Experimental modes</h2>
+      <div class="ml-05">
+        <label
+          class="form__group"
+          data-tip="Start each location fully zoomed in and reveal it over the CG timer duration. Guessing earlier preserves more of the time-sensitive points."
+        >
+          Progressive zoom mode
+          <input v-model="settings.progressiveZoomModeEnabled" type="checkbox" />
+        </label>
+        <label
+          class="form__group"
+          data-tip="How much of a 5,000-point accuracy score is affected by time. At 2,500, half stays fixed and half falls to zero over the CG timer duration."
+        >
+          Points affected by time
+          <input
+            v-model.number="settings.progressiveZoomAffectedPoints"
+            type="number"
+            min="0"
+            max="5000"
+            step="100"
+            :disabled="!settings.progressiveZoomModeEnabled"
+            @change="normalizeProgressiveZoomAffectedPoints"
+          />
+        </label>
+        <label
+          class="form__group"
+          data-tip="Let Twitch chat move, pan, zoom, and reset the view. Type !tmpz in chat for commands and short aliases. Round rules still apply."
+        >
+          Twitch moves, pans &amp; zooms (TMPZ)
+          <input v-model="settings.isTMPZModeEnabled" type="checkbox" />
+        </label>
+        <label
+          class="form__group"
+          data-tip="Cover the game view with a black mask and let chat move the circular opening. Type !peephole in chat for commands."
+        >
+          Peephole mode
+          <input v-model="settings.peepholeModeEnabled" type="checkbox" />
+        </label>
+        <label class="form__group" data-tip="Size of the visible circle">
+          Peephole size
+          <select v-model="settings.peepholeSize" :disabled="!settings.peepholeModeEnabled">
+            <option value="tiny">Tiny</option>
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div v-if="experimentalModesEnabled" v-show="currentTab === 'ai-settings'" class="content">
+      <h2>AI Description Mode</h2>
+      <div class="ml-05">
+        <label
+          class="form__group"
+          data-tip="Hides the Street View and shows an AI-written description of it instead"
+        >
+          AI Description Mode
+          <input v-model="settings.aiDescriptionMode" type="checkbox" />
+        </label>
+        <div
+          class="form__group"
+          data-tip="Create a key at openrouter.ai/keys. It is only stored on this computer"
+        >
+          OpenRouter API key
+          {{ aiApiKeyStatus.isSet ? `(saved ${aiApiKeyStatus.hint})` : '(not set)' }} :
+          <div class="flex gap-02">
+            <input
+              v-model.trim="aiApiKeyInput"
+              type="password"
+              placeholder="sk-or-…"
+              spellcheck="false"
+              autocomplete="off"
+              style="width: 200px"
+              @keyup.enter="saveAiApiKey(aiApiKeyInput)"
+            />
+            <button
+              class="btn bg-primary"
+              :disabled="!aiApiKeyInput"
+              @click="saveAiApiKey(aiApiKeyInput)"
+            >
+              Save
+            </button>
+            <button v-if="aiApiKeyStatus.isSet" class="btn bg-danger" @click="saveAiApiKey('')">
+              Remove
+            </button>
+          </div>
+        </div>
+        <label
+          class="form__group"
+          data-tip="Any OpenRouter model that accepts images (default: google/gemini-3.8-flash)"
+        >
+          AI model{{ isKnownVisionModel ? '' : ' (not a known image model)' }} :
+          <input
+            v-model.trim="settings.aiDescriptionModel"
+            type="text"
+            list="cg-ai-models"
+            spellcheck="false"
+            style="width: 260px"
+          />
+        </label>
+        <datalist id="cg-ai-models">
+          <option v-for="model of aiModels" :key="model.id" :value="model.id">
+            {{ model.name }}
+          </option>
+        </datalist>
+      </div>
+
+      <hr />
       <h2>AI voice <small>(reads AI descriptions aloud)</small></h2>
       <LocalVoiceSettings
         v-if="settings.ttsProvider === 'local'"
@@ -743,7 +531,8 @@
         v-model:enabled="settings.ttsEnabled"
         v-model:model="settings.ttsModel"
         v-model:voice="settings.ttsVoice"
-        :active="currentTab === 'ai-voice'"
+        :active="currentTab === 'ai-settings'"
+        :api-key-status="aiApiKeyStatus"
       />
     </div>
 
@@ -783,6 +572,7 @@
 import { shallowRef, shallowReactive, reactive, watch, computed } from 'vue'
 import { useClipboard } from '@vueuse/core'
 import Tabs from './ui/Tabs.vue'
+import ModeSettings from './ModeSettings.vue'
 import Userscripts from './Userscripts.vue'
 import LocalVoiceSettings from './LocalVoiceSettings.vue'
 import SpeechSettings from './SpeechSettings.vue'
@@ -796,25 +586,24 @@ const { socketConnectionState, twitchConnectionState } = defineProps<{
   socketConnectionState: SocketConnectionState
 }>()
 
-function isLetter(e) {
-  let char = String.fromCharCode(e.keyCode); // Get the character
-  if(/^[A-Za-z]+$/.test(char)) return true; // Match with regex 
-  else e.preventDefault(); // If not match, don't add to input text
-  return false;
-}
-
 const currentTab = shallowRef(
   twitchConnectionState.state === 'disconnected' ? 'twitch-connect' : 'game-settings'
 )
-const tabs = shallowRef([
-{ name: 'game-settings', value: 'Game settings' },
-{ name: 'mode-settings', value: 'Mode settings' },
+const experimentalModesEnabled = await chatguessrApi.getExperimentalModesEnabled()
+const tabs = [
+  { name: 'game-settings', value: 'Game settings' },
+  { name: 'mode-settings', value: 'Mode settings' },
   { name: 'twitch-connect', value: 'Twitch connect' },
   { name: 'ban-list', value: 'Ban list' },
   { name: 'messages', value: 'Messages' },
-  { name: 'ai-voice', value: 'AI voice' },
+  ...(experimentalModesEnabled
+    ? [
+        { name: 'experimental-modes', value: 'Experimental' },
+        { name: 'ai-settings', value: 'AI' }
+      ]
+    : []),
   { name: 'userscripts', value: 'Userscripts' }
-])
+]
 
 const settings = reactive<Settings>(await chatguessrApi.getSettings())
 const emit = defineEmits<{
@@ -866,12 +655,12 @@ const saveAiApiKey = async (apiKey: string) => {
   aiApiKeyInput.value = ''
 }
 
-// Fetched from OpenRouter, so only once someone actually opens the mode settings.
+// Fetched from OpenRouter only when someone opens the AI tab.
 const aiModels = shallowRef<AiModelOption[]>([])
 watch(
   currentTab,
   async (tab) => {
-    if (tab === 'mode-settings' && aiModels.value.length === 0) {
+    if (experimentalModesEnabled && tab === 'ai-settings' && aiModels.value.length === 0) {
       aiModels.value = await chatguessrApi.getAiVisionModels()
     }
   },
@@ -883,19 +672,8 @@ const isKnownVisionModel = computed(
     aiModels.value.some((model) => model.id === settings.aiDescriptionModel)
 )
 
-function modifyIsMultiGusssOnBRMode(event) {
-
-  if(event.target.checked)
-    settings.isMultiGuess = false
-}
-
 const resetModeSettings = () => {
   // Reset all mode settings to their default values
-  settings.isTMPZModeEnabled = false
-  settings.progressiveZoomModeEnabled = false
-  settings.progressiveZoomAffectedPoints = 5000
-  settings.peepholeModeEnabled = false
-  settings.peepholeSize = 'small'
   settings.isClosestInWrongCountryModeActivated = false
   settings.invertScoring = false
   settings.exclusiveMode = false
@@ -916,7 +694,6 @@ const resetModeSettings = () => {
   settings.ABCModeLetters = "ABCDE"
   settings.waterPlonkMode = "normal"
   settings.modifierMinusPointsIfWrongCountry = 0
-  settings.aiDescriptionMode = false
 }
 
 function normalizeProgressiveZoomAffectedPoints() {

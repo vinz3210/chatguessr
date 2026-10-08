@@ -1,4 +1,9 @@
 import { store } from './store'
+import {
+  applyExperimentalModes,
+  experimentalModesEnabled,
+  experimentalModeToggles
+} from './experimentalModes'
 
 const storedSettings = store.get('settings')
 
@@ -97,11 +102,18 @@ const defaultSettings = {
   ttsVoice: 'af_heart',
 }
 
-const settings = Object.assign({}, defaultSettings, storedSettings)
+const persistedSettings = Object.assign({}, defaultSettings, storedSettings)
+const settings = applyExperimentalModes(persistedSettings, experimentalModesEnabled)
 
 const saveSettings = (settings_: Settings): void => {
-  Object.assign(settings, settings_)
-  store.set('settings', settings)
+  const nextSettings = { ...settings_ }
+  // Saving ordinary settings must not erase the saved experimental mode selections.
+  if (!experimentalModesEnabled) {
+    for (const key of experimentalModeToggles) nextSettings[key] = persistedSettings[key]
+  }
+  Object.assign(persistedSettings, nextSettings)
+  Object.assign(settings, applyExperimentalModes(persistedSettings, experimentalModesEnabled))
+  store.set('settings', persistedSettings)
 }
 
 export { settings, saveSettings }

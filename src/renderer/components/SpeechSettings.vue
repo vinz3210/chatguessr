@@ -6,7 +6,7 @@
       only what you click gets read.
     </p>
     <p v-if="!apiKeyStatus.isSet" class="message error">
-      No OpenRouter API key yet. Add one in Mode settings → AI Description Mode.
+      No OpenRouter API key yet. Add one above in AI Description Mode.
     </p>
 
     <label class="form__group" data-tip="Off by default: every read-aloud is a paid request">
@@ -75,12 +75,12 @@ const { chatguessrApi } = window
 const props = defineProps<{
   /** Whether the tab is showing; the model list is only fetched once it is. */
   active: boolean
+  apiKeyStatus: AiApiKeyStatus
 }>()
 const enabled = defineModel<boolean>('enabled', { required: true })
 const model = defineModel<string>('model', { required: true })
 const voice = defineModel<string>('voice', { required: true })
 
-const apiKeyStatus = shallowRef<AiApiKeyStatus>(await chatguessrApi.getAiApiKeyStatus())
 const models = shallowRef<SpeechModelOption[]>([])
 const message = shallowRef('')
 
@@ -88,8 +88,6 @@ watch(
   () => props.active,
   async (active) => {
     if (!active) return
-    // The key may have been added in Mode settings since this opened.
-    apiKeyStatus.value = await chatguessrApi.getAiApiKeyStatus()
     if (models.value.length === 0) models.value = await chatguessrApi.getSpeechModels()
   },
   { immediate: true }
