@@ -84,6 +84,9 @@ const defaultSettings = {
   scoringMode: "off",
   rotationDuration: 15,
   autorotateAtStart: false,
+  autoCgEnabled: false,
+  autoCgResultsSeconds: 5,
+  autoCgMapVoting: false,
   aiDescriptionMode: false,
   // The OpenRouter API key is kept out of here on purpose: settings are readable from the page.
   aiDescriptionModel: 'google/gemini-3.8-flash',

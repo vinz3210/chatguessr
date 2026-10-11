@@ -4,6 +4,29 @@
 
     <div v-show="currentTab === 'game-settings'" class="content">
       <h2>Game Settings</h2>
+      <ModeCard
+        class="auto-cg-card"
+        v-model:enabled="settings.autoCgEnabled"
+        title="AutoCG"
+        description="Use the CG timer to plonk for the streamer, advance rounds, and start the next game automatically. Start the first game yourself."
+      >
+        <label class="form__group">
+          Show round and game results (seconds)
+          <input
+            v-model.number="settings.autoCgResultsSeconds"
+            type="number"
+            min="3"
+            max="120"
+            @change="normalizeAutoCgResultsSeconds"
+          />
+        </label>
+        <label class="form__group">
+          Let chat vote for the next map
+          <input v-model="settings.autoCgMapVoting" type="checkbox" />
+        </label>
+        <p>Voting starts in round 3. With voting off, AutoCG replays the same map.</p>
+        <p>Use the AutoCG button to pause or resume. Round length comes from the CG timer settings.</p>
+      </ModeCard>
       <div class="ml-05">
         <label
           class="form__group"
@@ -525,6 +548,7 @@ import { shallowRef, shallowReactive, reactive, watch, computed } from 'vue'
 import { useClipboard } from '@vueuse/core'
 import Tabs from './ui/Tabs.vue'
 import ModeSettings from './ModeSettings.vue'
+import ModeCard from './ui/ModeCard.vue'
 import Userscripts from './Userscripts.vue'
 import LocalVoiceSettings from './LocalVoiceSettings.vue'
 import SpeechSettings from './SpeechSettings.vue'
@@ -649,9 +673,20 @@ const resetModeSettings = () => {
   settings.modifierMinusPointsIfWrongCountry = 0
 }
 
+function normalizeAutoCgResultsSeconds() {
+  const seconds = Number(settings.autoCgResultsSeconds)
+  settings.autoCgResultsSeconds = Number.isFinite(seconds)
+    ? Math.max(3, Math.min(120, Math.round(seconds)))
+    : 5
+}
+
 </script>
 
 <style scoped>
+.auto-cg-card {
+  margin-bottom: 1rem;
+}
+
 textarea {
   min-height: 85px;
 }

@@ -34,11 +34,28 @@
     </div>
     <Timer
       :game-state
+      :auto-cg-enabled="autoCgSettings.autoCgEnabled && !autoCgPaused"
+      @expired="autoCg.expireRound()"
+      @pause="pauseAutoCg"
+      @stop="pauseAutoCg"
       :class="{ hidden: gameState !== 'in-round' || !widgetVisibility.timerVisible }"
     />
   </div>
 
   <div :class="['cg-menu', { 'peephole-active': peepholeVisible }]">
+    <button
+      v-if="autoCgSettings.autoCgEnabled"
+      class="cg-button cg-autocg-button"
+      :title="`${autoCgPaused ? 'Resume AutoCG' : 'Pause AutoCG'} — ${autoCgStatus}`"
+      :aria-label="autoCgPaused ? 'Resume AutoCG' : 'Pause AutoCG'"
+      :aria-pressed="autoCgPaused"
+      @click="toggleAutoCgPause"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path v-if="autoCgPaused" d="M7 4v16l14-8z" />
+        <path v-else d="M6 4h4v16H6zm8 0h4v16h-4z" />
+      </svg>
+    </button>
     <button
       :class="['cg-button', twitchConnectionState.state]"
       title="Settings"
@@ -68,7 +85,7 @@
       class="cg-button"
       title="Randomplonk for Streamer"
       :hidden="gameState === 'none'"
-      @click="onStreamerRandomplonk"
+      @click="onStreamerRandomplonk()"
     >
       <IconDice v-if="widgetVisibility.scoreboardAndGgInterfaceVisible" />
       <IconDice v-else />
@@ -149,6 +166,9 @@ import IconScoreboardHidden from '@/assets/icons/scoreboard_hidden.svg'
 import IconStartFlag from '@/assets/icons/start_flag.svg'
 import IconEyeShut from '@/assets/icons/eye_shut.svg'
 import { rendererApi } from '../rendererApi'
+import { AutoCgLoop } from '../autoCgLoop'
+import { advanceAutoCgRound, startAutoCgMap } from '../autoCgDom'
+import { isAutoCgGamePage, isAutoCgMapPage } from '../autoCgMapStart'
 import { progressiveZoomLevel } from '../progressiveZoomVisual'
 import { installFaceNorthShortcut } from '../faceNorthShortcut'
 import type PostProcessingController from '../mods/extenssr/post_processing_controller'
@@ -164,6 +184,126 @@ const settingsVisible = shallowRef(false)
 const leaderboardVisible = shallowRef(false)
 
 const gameState = shallowRef<GameState>('none')
+const autoCgSettings = shallowRef<Pick<Settings, 'autoCgEnabled' | 'autoCgResultsSeconds' | 'autoCgMapVoting'>>({
+  autoCgEnabled: false,
+  autoCgResultsSeconds: 5,
+  autoCgMapVoting: false
+})
+const autoCgPaused = shallowRef(false)
+const autoCgStatus = shallowRef('AutoCG running')
+const pendingStartKey = 'cg_autocg_pending_start'
+let mapStartTimer: ReturnType<typeof setTimeout> | undefined
+let mapStartRevision = 0
+
+const autoCg = new AutoCgLoop({
+  enabled: () => autoCgSettings.value.autoCgEnabled && !autoCgPaused.value,
+  resultsMs: () => autoCgSettings.value.autoCgResultsSeconds * 1000,
+  plonk: async (signal) => {
+    if (gameState.value !== 'in-round') return false
+    return onStreamerRandomplonk(true, signal)
+  },
+  advance: advanceAutoCgRound,
+  replay: async (signal) => {
+    const map = await chatguessrApi.getAutoCgNextMap()
+    if (signal.aborted || !map || gameState.value !== 'game-results' || !autoCgSettings.value.autoCgEnabled || autoCgPaused.value) return false
+    window.sessionStorage.setItem(pendingStartKey, JSON.stringify(map))
+    window.location.href = `https://www.geoguessr.com/maps/${map.id}`
+    return true
+  },
+  status: (message) => {
+    autoCgStatus.value = message
+    if (message.startsWith('AutoCG paused:')) autoCgPaused.value = true
+  }
+})
+
+function cancelMapStart() {
+  mapStartRevision++
+  clearTimeout(mapStartTimer)
+}
+
+function pauseAutoCg() {
+  if (autoCgSettings.value.autoCgEnabled) {
+    autoCgStatus.value = 'AutoCG paused'
+    autoCgPaused.value = true
+  }
+}
+
+function toggleAutoCgPause() {
+  autoCgPaused.value = !autoCgPaused.value
+  if (autoCgPaused.value) autoCgStatus.value = 'AutoCG paused'
+  if (!autoCgPaused.value) {
+    autoCgStatus.value = 'AutoCG running'
+    resumePendingMap()
+  }
+}
+
+function resumePendingMap() {
+  cancelMapStart()
+  const raw = window.sessionStorage.getItem(pendingStartKey)
+  if (!raw || !autoCgSettings.value.autoCgEnabled || autoCgPaused.value) return
+  let map: { id: string; nmpz?: boolean }
+  try {
+    map = JSON.parse(raw)
+  } catch {
+    window.sessionStorage.removeItem(pendingStartKey)
+    return
+  }
+  if (typeof map.id !== 'string' || !isAutoCgMapPage(window.location.pathname, map.id)) {
+    window.sessionStorage.removeItem(pendingStartKey)
+    return
+  }
+  const revision = mapStartRevision
+  const deadline = Date.now() + 30000
+  let lastClickAt = 0
+  const attempt = () => {
+    if (revision !== mapStartRevision || !autoCgSettings.value.autoCgEnabled || autoCgPaused.value) return
+    if (isAutoCgGamePage(window.location.pathname)) {
+      window.sessionStorage.removeItem(pendingStartKey)
+      return
+    }
+    try {
+      if (Date.now() - lastClickAt >= 2000 && startAutoCgMap(map.nmpz)) {
+        lastClickAt = Date.now()
+        autoCgStatus.value = 'AutoCG starting next game…'
+      }
+    } catch (error) {
+      autoCgStatus.value = `AutoCG paused: ${error instanceof Error ? error.message : String(error)}`
+      autoCgPaused.value = true
+      return
+    }
+    if (Date.now() >= deadline) {
+      autoCgStatus.value = 'AutoCG paused: map start controls did not appear.'
+      autoCgPaused.value = true
+      return
+    }
+    mapStartTimer = setTimeout(attempt, 250)
+  }
+  mapStartTimer = setTimeout(attempt, 500)
+}
+
+watch(gameState, (state) => autoCg.transition(state))
+watch(autoCgPaused, (paused) => {
+  autoCg.setPaused(paused)
+  if (paused) cancelMapStart()
+})
+watch(() => autoCgSettings.value.autoCgEnabled, (enabled) => {
+  autoCg.transition(gameState.value, true)
+  if (!enabled) {
+    cancelMapStart()
+    window.sessionStorage.removeItem(pendingStartKey)
+  }
+})
+onMounted(async () => {
+  autoCgSettings.value = await chatguessrApi.getSettings()
+  resumePendingMap()
+})
+onBeforeUnmount(chatguessrApi.onSettingsChanged((settings) => {
+  autoCgSettings.value = settings
+}))
+onBeforeUnmount(() => {
+  autoCg.cancel()
+  cancelMapStart()
+})
 const isMultiGuess = shallowRef<boolean>(false)
 const isBRMode = shallowRef<boolean>(false)
 const modeHelp = shallowRef<string[]>([])
@@ -1052,47 +1192,22 @@ async function onSpinLeft360() {
   
 }
 
-async function onStreamerRandomplonk() {
-  let latlng = await chatguessrApi.getRandomPlonkLatLng()
-  let {lat,lng} = {lat: latlng.lat, lng: latlng.lng}
-    
- 
-
- 
-    // Okay well played Geoguessr u got me there for a minute, but below should work.
-    // Below is the only intentionally complicated part of the code - it won't be simplified or explained for good reason.
-    // let element = document.getElementsByClassName("guess-map_canvas__JAHHT")[0]
-    let element = document.querySelectorAll('[class^="guess-map_canvas__"]')[0]
-
-    let keys = Object.keys(element)
-    let key = keys.find(key => key.startsWith("__reactFiber$"))
-    if (!key) return
-    let props = element[key]
-    let x = props.return.return.memoizedProps.map.__e3_.click
-    let objectKeys = Object.keys(x)
-    let y = objectKeys[objectKeys.length - 1]
- 
-    const z = {
-        latLng:{
-            lat: () => lat,
-            lng: () => lng,
-        }
-    }
- 
-    const xy = x[y]
-    const a = Object.keys(x[y])
- 
-    for(let i = 0; i < a.length ;i++){
-        let q = a[i]
-        if (typeof xy[q] === "function"){
-            xy[q](z)
-        }
-    }
-    window.setTimeout(() => {
-        // click button element with data-qa="perform-guess"
-        const buttonElement = document.querySelector('[data-qa="perform-guess"]')
-        buttonElement?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    }, 200)
+async function onStreamerRandomplonk(automated = false, signal?: AbortSignal): Promise<boolean> {
+  if (gameState.value !== 'in-round') return false
+  const roundLocation = currentLocation.value
+  const latlng = await chatguessrApi.getRandomPlonkLatLng()
+  if (signal?.aborted || gameState.value !== 'in-round' || roundLocation !== currentLocation.value) return false
+  if (automated && (!autoCgSettings.value.autoCgEnabled || autoCgPaused.value)) return false
+  const button = document.querySelector<HTMLButtonElement>('[data-qa="perform-guess"]')
+  if (!button) return false
+  if (!rendererApi.placeStreamerGuess(latlng)) return false
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  if (signal?.aborted || gameState.value !== 'in-round' || roundLocation !== currentLocation.value) return true
+  if (automated && (!autoCgSettings.value.autoCgEnabled || autoCgPaused.value)) return false
+  const readyButton = document.querySelector<HTMLButtonElement>('[data-qa="perform-guess"]')
+  if (!readyButton || readyButton.disabled) return false
+  readyButton.click()
+  return true
 }
 
 /** Load and update twitch connection state. */
@@ -1204,6 +1319,18 @@ function useSocketConnectionState() {
 
 .cg-button:hover {
   background: rgba(0, 0, 0, 0.5);
+}
+
+.cg-autocg-button {
+  align-items: center;
+  justify-content: center;
+  color: #1cd997;
+}
+
+.cg-autocg-button svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
 }
 .cg-button:active {
   transform: scale(0.9);

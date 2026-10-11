@@ -5,6 +5,7 @@ import Game from './Game'
 import TwitchBackend from './utils/useTwitchJS'
 import { settings, saveSettings } from './utils/useSettings'
 import useAiDescription from './utils/useAiDescription'
+import MapVoting from './utils/MapVoting'
 import { getCountryCode } from './utils/countryLookup'
 
 import {
@@ -39,6 +40,18 @@ export default class GameHandler {
   #socket: Socket | undefined
 
   #game: Game
+  #mapVoting = new MapVoting(async (message) => {
+    await this.#backend?.sendMessage(message, { system: true })
+  })
+  #autoCgVotingGame: string | undefined
+
+  #startAutoCgVoting() {
+    if (!settings.autoCgEnabled || !settings.autoCgMapVoting || !this.#game.isInGame || this.#game.isFinished || this.#game.round < 3) return
+    const token = this.#game.seed?.token
+    if (!token || token === this.#autoCgVotingGame) return
+    this.#autoCgVotingGame = token
+    void this.#mapVoting.start().catch(console.error)
+  }
 
   #streamerDidRandomPlonk: boolean
 
@@ -120,6 +133,7 @@ export default class GameHandler {
             { system: true }
           )
         this.openGuesses()
+        this.#startAutoCgVoting()
       }
     } finally {
       this.#nextRoundInFlight = false
@@ -542,11 +556,14 @@ export default class GameHandler {
             }
 
             this.openGuesses()
+            this.#startAutoCgVoting()
           })
           .catch((err) => {
             console.error(err)
           })
       } else {
+        this.#mapVoting.cancel()
+        this.#autoCgVotingGame = undefined
         this.#game.outGame()
         this.#win.webContents.send('game-quitted')
       }
@@ -686,7 +703,22 @@ export default class GameHandler {
 
     ipcMain.on('save-settings', (_event, settings_: Settings) => {
       saveSettings(settings_)
+      this.#win.webContents.send('settings-changed', settings)
+      if (!settings.autoCgEnabled || !settings.autoCgMapVoting) {
+        this.#mapVoting.cancel()
+        this.#autoCgVotingGame = undefined
+      } else {
+        this.#startAutoCgVoting()
+      }
     })
+
+    ipcMain.handle('autocg:next-map', async () => {
+      if (!settings.autoCgEnabled || !this.#game.isFinished) return null
+      const map = settings.autoCgMapVoting ? await this.#mapVoting.takeNextMap() : null
+      if (!settings.autoCgEnabled) return null
+      return map ?? (this.#game.seed?.map ? { id: this.#game.seed.map } : null)
+    })
+    this.#win.once('closed', () => this.#mapVoting.cancel())
 
     ipcMain.on('reconnect', () => {
       this.#requestAuthentication()
@@ -1049,6 +1081,9 @@ export default class GameHandler {
   #cgCooldown: boolean = false
   #mapCooldown: boolean = false
   async #handleMessage(userstate: UserData, message: string) {
+    if (settings.autoCgEnabled && settings.autoCgMapVoting) {
+      this.#mapVoting.vote(userstate['user-id'], message)
+    }
   /////// custom rewards
   
 

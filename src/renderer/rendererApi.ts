@@ -1,7 +1,9 @@
 import { getLocalStorage, setLocalStorage } from './useLocalStorage'
 import { globeResultsOverlay, type GlobeResultOverlayItem } from './globeResultsOverlay'
+import { findGuessMap } from './guessMap'
 
 let globalMap: google.maps.Map | undefined = undefined
+const capturedMaps = new Set<google.maps.Map>()
 const mapReady = hijackMap()
 setupMapStyleShortcuts()
 
@@ -450,6 +452,10 @@ async function hijackMap() {
       constructor(mapDiv: HTMLElement, opts: google.maps.MapOptions) {
         opts.mapId = opts.mapId || 'DEMO_MAP_ID'
         super(mapDiv, opts)
+        for (const map of capturedMaps) {
+          if (!map.getDiv().isConnected) capturedMaps.delete(map)
+        }
+        capturedMaps.add(this)
 
 
         // https://c.tile.opentopomap.org/2/2/3.png
@@ -511,6 +517,16 @@ async function hijackMap() {
 }
 
 export const rendererApi = {
+  placeStreamerGuess(position: LatLng) {
+    const canvas = document.querySelector<HTMLElement>('[class*="guess-map_canvas__"]')
+    if (!canvas) return false
+    const guessMap = findGuessMap(canvas, capturedMaps)
+    if (!guessMap) return false
+    google.maps.event.trigger(guessMap, 'click', {
+      latLng: new google.maps.LatLng(position.lat, position.lng)
+    })
+    return true
+  },
   drawRoundResults,
   drawPlayerResults,
   focusOnGuess,

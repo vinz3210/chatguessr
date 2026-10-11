@@ -17,6 +17,21 @@ Want to support the project? Go to <a href="https://chatguessr.com">the official
 
 ## Game Modes
 
+### AutoCG
+
+Enable **Game settings → AutoCG**, set the round length in the CG timer settings, and start
+the first game manually. AutoCG starts the timer each round, closes chat guesses at expiry,
+random-plonks for the streamer, and waits for the configured results duration before advancing.
+After the game results it starts another game. Use the AutoCG overlay button to pause or resume;
+pausing or stopping the CG timer also pauses AutoCG.
+
+**Let chat vote for the next map** is optional. With voting off, the same map is replayed. With
+voting on, three distinct maps are offered in round 3 and chat votes with the displayed emotes
+or `!vote 1`, `!vote 2`, `!vote 3`. Each viewer has one vote and can change it. Ties and empty
+votes pick randomly. The pool comes from `vinz3210.gg/automaplist.json`, with a bundled fallback.
+
+Automation pauses if controls cannot be found within 30 seconds or GeoGuessr blocks map access.
+
 ### Experimental modes and AI
 
 TMPZ, peephole, progressive zoom, and AI features are available under **Mode settings →

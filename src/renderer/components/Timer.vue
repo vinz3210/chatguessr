@@ -31,8 +31,8 @@
       <div :class="iconsVisibility ? 'expanded' : 'collapsed'">
         <div class="flex items-center justify-center gap-05">
           <IconStart v-if="!isStarted || isPaused" @click="start" />
-          <IconPause v-else @click="pause" />
-          <IconStop v-if="isStarted" @click="reset" />
+          <IconPause v-else @click="pauseFromControls" />
+          <IconStop v-if="isStarted" @click="stopFromControls" />
           <IconGearStroke @click="settingsVisibility = !settingsVisibility" />
         </div>
       </div>
@@ -50,7 +50,7 @@
           <input v-model="settings.autoCloseGuesses" type="checkbox" />
         </label>
         <hr />
-        
+
         <label class="form__group">
           Break time ({{ tempTimeLimit }} sec) :
           <div class="flex gap-05">
@@ -62,12 +62,7 @@
 
         <label class="form__group"
           >Time ({{ settings.timeLimit }} sec) :
-          <input
-            v-model.number="settings.timeLimit"
-            type="number"
-            min="5"
-            @input="reset()"
-          />
+          <input v-model.number="settings.timeLimit" type="number" min="5" @input="reset()" />
         </label>
         <label class="form__group"
           >Time's up message :
@@ -164,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { shallowRef, watch, reactive, onMounted } from 'vue'
+import { shallowRef, watch, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { getLocalStorage, setLocalStorage } from '@/useLocalStorage'
 import IconStart from '@/assets/icons/start.svg'
 import IconPause from '@/assets/icons/pause.svg'
@@ -175,13 +170,26 @@ import IconAudio from '@/assets/icons/audio.svg'
 const { chatguessrApi } = window
 const props = defineProps<{
   gameState: GameState
+  autoCgEnabled?: boolean
 }>()
+const emit = defineEmits<{
+  (event: 'expired'): void
+  (event: 'pause'): void
+  (event: 'stop'): void
+}>()
+watch(
+  () => props.autoCgEnabled,
+  (enabled) => {
+    if (enabled && props.gameState === 'in-round') start()
+    else if (isStarted.value) pause()
+  }
+)
 watch(
   () => props.gameState,
   (gameState) => {
     if (gameState === 'in-round') {
       reset()
-      if (settings.autoStart) start()
+      if (settings.autoStart || props.autoCgEnabled) start()
     } else {
       reset()
     }
@@ -231,6 +239,8 @@ watch(tempTimeLimit, (val) => setLocalStorage('cg_timer__break_time', val))
 let targetTimestamp = 0
 let pausedDifference = 0
 let frameInterval = () => {}
+let animationFrame: number | undefined
+onBeforeUnmount(() => cancelAnimationFrame(animationFrame!))
 
 onMounted(async () => {
   audioPath.value = await chatguessrApi.appDataPathExists('\\timer\\timer_alert')
@@ -367,7 +377,8 @@ onMounted(async () => {
   availableFonts.value = [...fontsAvailable.values()]
 })
 
-const start = () => {
+function start() {
+  cancelAnimationFrame(animationFrame!)
   isStarted.value = true
   isPaused.value = false
 
@@ -392,15 +403,18 @@ const start = () => {
     if (targetTimestamp - Date.now() < 1) {
       reset()
       if (settings.timesUpMsg) display.value = settings.timesUpMsg
-      if (settings.autoCloseGuesses) chatguessrApi.setGuessesOpen(false)
+      if (settings.autoCloseGuesses || props.autoCgEnabled) chatguessrApi.setGuessesOpen(false)
+      if (props.autoCgEnabled) emit('expired')
+      return
     } else updateDisplay()
 
-    requestAnimationFrame(frameInterval)
+    animationFrame = requestAnimationFrame(frameInterval)
   }
   frameInterval()
 }
 
 const pause = () => {
+  cancelAnimationFrame(animationFrame!)
   isPaused.value = true
 
   const nowTimestamp = Date.now()
@@ -420,6 +434,16 @@ const reset = () => {
   pausedDifference = 0
 
   updateDisplay()
+}
+
+const pauseFromControls = () => {
+  pause()
+  emit('pause')
+}
+
+const stopFromControls = () => {
+  reset()
+  emit('stop')
 }
 
 const resetWithTempTime = () => {

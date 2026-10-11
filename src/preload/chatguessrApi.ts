@@ -33,6 +33,12 @@ export const chatguessrApi = {
   saveSettings(settings: Settings) {
     ipcRenderer.send('save-settings', settings)
   },
+  onSettingsChanged(callback: (settings: Settings) => void) {
+    return ipcRendererOn('settings-changed', callback)
+  },
+  getAutoCgNextMap(): Promise<{ id: string; nmpz?: boolean } | null> {
+    return ipcRenderer.invoke('autocg:next-map')
+  },
   startProgressiveZoomRound(timeLimit: number, panoramaReadyAt?: number): Promise<{ startedAt: number; durationMs: number } | null> {
     return ipcRenderer.invoke('start-progressive-zoom-round', timeLimit, panoramaReadyAt)
   },
